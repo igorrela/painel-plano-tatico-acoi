@@ -408,8 +408,10 @@ $("formEntrada").addEventListener("submit", async ev => {
     const m = String(error.message || "").toLowerCase();
     if(m.includes("autorizado") || m.includes("not authorized") || m.includes("database error") || m.includes("unexpected_failure")){
       recado("<strong>E-mail não autorizado.</strong> Este endereço não está na lista de acesso do plano. Peça ao Igor Rela para incluir você.", "ruim");
-    } else if(m.includes("rate") || m.includes("seconds")){
-      recado("Você pediu links demais em pouco tempo. Espere um minuto e tente de novo.", "ruim");
+    } else if(m.includes("rate") || m.includes("seconds") || m.includes("limit")){
+      recado("<strong>O envio de e-mails atingiu o limite da hora.</strong> Não é problema do seu cadastro nem do seu e-mail: "
+        + "o serviço de envio está no plano gratuito e libera poucos links por hora, para todo mundo junto. "
+        + "Tente de novo mais tarde ou avise o Igor Rela.", "ruim");
     } else {
       recado("Não consegui enviar o link agora. Tente de novo em instantes.", "ruim");
     }
