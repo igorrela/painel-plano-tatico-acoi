@@ -1,0 +1,1053 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Plano Tático ACOI</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏗️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  color-scheme:light dark;
+  --ground:#F4F6F8; --surface:#FFFFFF; --surface-2:#EDF1F5; --surface-3:#E3E9EF;
+  --ink:#131820; --ink-2:#54606F; --ink-3:#828E9C;
+  --line:#DBE1E9; --line-2:#C4CEDA;
+  --accent:#1B3A5C; --accent-2:#2C5A87; --accent-soft:#E4EDF5; --on-accent:#FFFFFF;
+  --ok:#159C82; --ok-soft:#E2F2EE;
+  --wip:#B57C08; --wip-soft:#F8EEDA;
+  --late:#A32D50; --late-soft:#F8E4EA;
+  --track:#DDE4EC;
+  --shadow:0 1px 2px rgba(19,24,32,.06), 0 4px 14px rgba(19,24,32,.05);
+  --radius:7px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0F1318; --surface:#161B22; --surface-2:#1C232B; --surface-3:#232B35;
+    --ink:#E7ECF3; --ink-2:#9BA6B4; --ink-3:#6E7A88;
+    --line:#252D37; --line-2:#333D49;
+    --accent:#6FA8D4; --accent-2:#8CBCE0; --accent-soft:#17293A; --on-accent:#0F1318;
+    --ok:#14A38F; --ok-soft:#102B29;
+    --wip:#B4861F; --wip-soft:#2B2415;
+    --late:#BB3A6E; --late-soft:#2E1622;
+    --track:#28313C;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0F1318; --surface:#161B22; --surface-2:#1C232B; --surface-3:#232B35;
+  --ink:#E7ECF3; --ink-2:#9BA6B4; --ink-3:#6E7A88;
+  --line:#252D37; --line-2:#333D49;
+  --accent:#6FA8D4; --accent-2:#8CBCE0; --accent-soft:#17293A; --on-accent:#0F1318;
+  --ok:#14A38F; --ok-soft:#102B29;
+  --wip:#B4861F; --wip-soft:#2B2415;
+  --late:#BB3A6E; --late-soft:#2E1622;
+  --track:#28313C;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0; text-wrap:balance; font-weight:600; letter-spacing:-.01em}
+button{font:inherit; color:inherit; cursor:pointer}
+[hidden]{display:none !important}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+@media (prefers-reduced-motion: reduce){ *{animation:none!important; transition:none!important} }
+
+/* ---------- entrada ---------- */
+.entrada{min-height:100dvh; display:grid; place-items:center; padding:24px}
+.cartao-entrada{
+  background:var(--surface); border:1px solid var(--line); border-radius:12px;
+  box-shadow:var(--shadow); padding:34px 32px; width:100%; max-width:430px;
+}
+.cartao-entrada .selo-marca{font-size:11px; text-transform:uppercase; letter-spacing:.11em; color:var(--ink-3); font-weight:600}
+.cartao-entrada h1{font-size:22px; margin:7px 0 10px; letter-spacing:-.02em}
+.cartao-entrada p{color:var(--ink-2); font-size:13.5px; margin:0 0 20px}
+.campo{display:block; margin-bottom:14px}
+.campo span{display:block; font-size:12.5px; font-weight:500; margin-bottom:6px}
+.campo input{
+  width:100%; border:1px solid var(--line-2); background:var(--surface); color:var(--ink);
+  border-radius:var(--radius); padding:10px 12px; font:inherit; font-size:14px;
+}
+.campo input:focus{border-color:var(--accent)}
+.recado{padding:11px 13px; border-radius:var(--radius); font-size:13px; margin-top:14px; border:1px solid transparent}
+.recado.bom{background:var(--ok-soft); color:var(--ok); border-color:color-mix(in srgb, var(--ok) 30%, transparent)}
+.recado.ruim{background:var(--late-soft); color:var(--late); border-color:color-mix(in srgb, var(--late) 30%, transparent)}
+.recado.info{background:var(--surface-2); color:var(--ink-2); border-color:var(--line-2)}
+
+/* ---------- barra superior ---------- */
+.topo{
+  position:sticky; top:0; z-index:40; background:var(--surface);
+  border-bottom:1px solid var(--line); display:flex; align-items:center;
+  gap:18px; padding:0 20px; height:56px;
+}
+.marca{display:flex; align-items:baseline; gap:9px; flex-shrink:0}
+.marca .nome{font-size:15px; font-weight:600; letter-spacing:-.015em}
+.marca .sub{font-size:11px; color:var(--ink-3); text-transform:uppercase; letter-spacing:.09em; font-weight:500}
+.abas{display:flex; gap:2px; background:var(--surface-2); padding:3px; border-radius:var(--radius); flex-shrink:0}
+.abas button{border:0; background:transparent; padding:6px 14px; border-radius:5px; font-size:13px; font-weight:500; color:var(--ink-2)}
+.abas button[aria-selected="true"]{background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font-weight:600}
+.topo-dir{margin-left:auto; display:flex; align-items:center; gap:12px; flex-shrink:0}
+.sinc{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink-2)}
+.ponto{width:7px; height:7px; border-radius:50%; background:var(--ink-3); flex-shrink:0}
+.ponto.vivo{background:var(--ok)}
+.ponto.local{background:var(--wip)}
+.eu{font-size:12.5px; color:var(--ink-2); max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.btn{border:1px solid var(--line-2); background:var(--surface); border-radius:var(--radius); padding:7px 13px; font-size:13px; font-weight:500; display:inline-flex; align-items:center; gap:7px}
+.btn:hover{background:var(--surface-2); border-color:var(--ink-3)}
+.btn.primario{background:var(--accent); color:var(--on-accent); border-color:var(--accent)}
+.btn.primario:hover{background:var(--accent-2); border-color:var(--accent-2)}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.btn.largo{width:100%; justify-content:center; padding:11px}
+
+main{padding:22px 20px 60px; max-width:1560px; margin:0 auto}
+.aviso{display:flex; gap:11px; align-items:flex-start; padding:11px 14px; border-radius:var(--radius);
+  background:var(--wip-soft); border:1px solid color-mix(in srgb, var(--wip) 32%, transparent); font-size:13px; margin-bottom:18px; color:var(--ink)}
+.secao-titulo{font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--ink-3); font-weight:600; margin:30px 0 12px}
+
+.kpis{display:grid; grid-template-columns:repeat(auto-fit, minmax(158px,1fr)); gap:11px}
+.kpi{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 15px 13px; box-shadow:var(--shadow); position:relative; overflow:hidden}
+.kpi .rotulo{font-size:11.5px; color:var(--ink-2); font-weight:500}
+.kpi .valor{font-size:29px; font-weight:600; letter-spacing:-.03em; margin-top:5px; line-height:1.05}
+.kpi .nota{font-size:11.5px; color:var(--ink-3); margin-top:3px}
+.kpi .faixa{position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--line-2)}
+.kpi.ok .faixa{background:var(--ok)} .kpi.ok .valor{color:var(--ok)}
+.kpi.wip .faixa{background:var(--wip)} .kpi.wip .valor{color:var(--wip)}
+.kpi.late .faixa{background:var(--late)} .kpi.late .valor{color:var(--late)}
+
+.legenda{display:flex; gap:16px; flex-wrap:wrap; margin-bottom:14px; font-size:12px; color:var(--ink-2)}
+.legenda span{display:inline-flex; align-items:center; gap:6px}
+.chave{width:11px; height:11px; border-radius:2.5px; flex-shrink:0}
+.frentes{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden}
+.frente{display:grid; grid-template-columns:190px 1fr 92px; gap:14px; align-items:center; padding:11px 16px; border-bottom:1px solid var(--line)}
+.frente:last-child{border-bottom:0}
+.frente:hover{background:var(--surface-2)}
+.frente .nome{font-size:13px; font-weight:500}
+.frente .nome small{display:block; color:var(--ink-3); font-weight:400; font-size:11px; margin-top:1px}
+.barra{height:19px; background:var(--track); border-radius:3px; display:flex; overflow:hidden}
+.barra i{display:block; height:100%; font-style:normal; border-right:2px solid var(--surface)}
+.barra i:last-child{border-right:0}
+.barra i.ok{background:var(--ok)} .barra i.wip{background:var(--wip)} .barra i.late{background:var(--late)}
+.frente .pct{text-align:right; font-size:13px; font-weight:600}
+.frente .pct small{display:block; font-weight:400; color:var(--ink-3); font-size:11px}
+
+.duas{display:grid; grid-template-columns:repeat(auto-fit, minmax(370px,1fr)); gap:16px}
+.cartao{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden}
+.cartao > header{padding:13px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:10px}
+.cartao > header h3{font-size:13.5px}
+.cartao > header .conta{font-size:12px; color:var(--ink-3); font-family:"IBM Plex Mono", monospace}
+.linha{display:flex; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line); align-items:flex-start}
+.linha:last-child{border-bottom:0}
+.linha:hover{background:var(--surface-2); cursor:pointer}
+.linha .corpo{flex:1; min-width:0}
+.linha .t{font-size:13px; line-height:1.4}
+.linha .m{font-size:11.5px; color:var(--ink-3); margin-top:3px; display:flex; gap:9px; flex-wrap:wrap}
+.linha .dir{flex-shrink:0; text-align:right; font-size:12px; font-weight:600}
+.vazio{padding:26px 16px; text-align:center; color:var(--ink-3); font-size:13px}
+.selo{display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:500; white-space:nowrap; border:1px solid transparent}
+.selo.ok{background:var(--ok-soft); color:var(--ok); border-color:color-mix(in srgb, var(--ok) 28%, transparent)}
+.selo.wip{background:var(--wip-soft); color:var(--wip); border-color:color-mix(in srgb, var(--wip) 28%, transparent)}
+.selo.late{background:var(--late-soft); color:var(--late); border-color:color-mix(in srgb, var(--late) 28%, transparent)}
+.selo.neutro{background:var(--surface-2); color:var(--ink-2); border-color:var(--line-2)}
+
+.filtros{display:flex; gap:9px; flex-wrap:wrap; align-items:center; margin-bottom:13px}
+.filtros input[type="search"], .filtros select{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:var(--radius); padding:7px 11px; font:inherit; font-size:13px}
+.filtros input[type="search"]{min-width:250px; flex:1; max-width:400px}
+.chip{border:1px solid var(--line-2); background:var(--surface); border-radius:20px; padding:6px 13px; font-size:12.5px; font-weight:500}
+.chip[aria-pressed="true"]{background:var(--late-soft); border-color:var(--late); color:var(--late)}
+.contagem{margin-left:auto; font-size:12.5px; color:var(--ink-3); font-family:"IBM Plex Mono", monospace}
+.grade-caixa{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); overflow:auto; max-height:calc(100vh - 210px)}
+table.grade{border-collapse:separate; border-spacing:0; width:100%; font-size:13px}
+table.grade th{position:sticky; top:0; z-index:2; background:var(--surface-2); text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-2); font-weight:600; padding:9px 10px; border-bottom:1px solid var(--line-2); white-space:nowrap; cursor:pointer; user-select:none}
+table.grade th:hover{color:var(--ink)}
+table.grade th .seta{color:var(--accent); margin-left:3px}
+table.grade td{padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top}
+table.grade tr:hover td{background:var(--surface-2)}
+table.grade tr.risco td{box-shadow:inset 3px 0 0 var(--late)}
+td.cel-id{font-family:"IBM Plex Mono", monospace; font-size:11.5px; color:var(--ink-3); white-space:nowrap}
+td.cel-tarefa{min-width:330px; max-width:460px}
+td.cel-res{min-width:120px; max-width:170px}
+td.cel-prazo{white-space:nowrap; font-family:"IBM Plex Mono", monospace; font-size:12.5px}
+td.cel-status, td.cel-frente, td.cel-prio{white-space:nowrap}
+td.cel-nota{min-width:180px; max-width:300px; color:var(--ink-2); font-size:12.5px}
+td[data-editar]{cursor:text}
+td .editando{width:100%; border:1.5px solid var(--accent); border-radius:4px; padding:5px 7px; font:inherit; font-size:13px; background:var(--surface); color:var(--ink); min-height:30px}
+td textarea.editando{resize:vertical; min-height:62px; line-height:1.45}
+.acao-linha{border:0; background:transparent; color:var(--ink-3); padding:3px 6px; border-radius:4px; font-size:15px; line-height:1}
+.acao-linha:hover{background:var(--late-soft); color:var(--late)}
+
+.painel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; margin-bottom:16px}
+.painel h3{font-size:14.5px; margin-bottom:6px}
+.painel p{margin:0 0 14px; color:var(--ink-2); font-size:13px; max-width:66ch}
+.solta{border:1.5px dashed var(--line-2); border-radius:var(--radius); padding:34px 20px; text-align:center; background:var(--surface-2); transition:border-color .15s, background .15s}
+.solta.sobre{border-color:var(--accent); background:var(--accent-soft)}
+.solta .dica{font-size:12.5px; color:var(--ink-3); margin-top:7px}
+.difs{display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:10px; margin:16px 0}
+.dif{padding:11px 13px; border-radius:var(--radius); border:1px solid var(--line); background:var(--surface-2)}
+.dif .n{font-size:23px; font-weight:600; letter-spacing:-.02em}
+.dif .r{font-size:11.5px; color:var(--ink-2); margin-top:2px}
+.dif.nova .n{color:var(--accent)} .dif.mud .n{color:var(--wip)} .dif.sumiu .n{color:var(--late)}
+.mudancas{max-height:400px; overflow:auto; border:1px solid var(--line); border-radius:var(--radius)}
+.mud-linha{padding:11px 14px; border-bottom:1px solid var(--line); font-size:13px}
+.mud-linha:last-child{border-bottom:0}
+.mud-linha .cab{display:flex; gap:9px; align-items:center; margin-bottom:5px}
+.campo-mud{font-size:12px; color:var(--ink-2); margin-top:3px; padding-left:11px; border-left:2px solid var(--line-2)}
+.campo-mud b{color:var(--ink); font-weight:600}
+.de{color:var(--late); text-decoration:line-through; opacity:.8}
+.para{color:var(--ok); font-weight:500}
+.progresso{height:5px; background:var(--track); border-radius:3px; overflow:hidden; margin-top:12px}
+.progresso i{display:block; height:100%; background:var(--accent); transition:width .2s}
+</style>
+</head>
+<body>
+
+<div class="entrada" id="telaEntrada">
+  <div class="cartao-entrada">
+    <div class="selo-marca">ACOI · Corp · Home · Projetos</div>
+    <h1>Plano Tático</h1>
+    <p id="textoEntrada">Acesso restrito. Informe o e-mail cadastrado e enviamos um link de entrada válido por uma hora.</p>
+    <form id="formEntrada">
+      <label class="campo">
+        <span>E-mail</span>
+        <input type="email" id="campoEmail" required autocomplete="email" placeholder="nome@acoi.com.br" spellcheck="false">
+      </label>
+      <button class="btn primario largo" type="submit" id="btEntrar">Receber link de acesso</button>
+    </form>
+    <div id="recadoEntrada" hidden></div>
+  </div>
+</div>
+
+<div id="telaApp" hidden>
+  <div class="topo">
+    <div class="marca"><span class="nome">Plano Tático ACOI</span><span class="sub">Corp · Home · Projetos</span></div>
+    <div class="abas" role="tablist">
+      <button role="tab" aria-selected="true" data-vista="painel">Painel</button>
+      <button role="tab" aria-selected="false" data-vista="planilha">Planilha</button>
+      <button role="tab" aria-selected="false" data-vista="importar">Importar e exportar</button>
+    </div>
+    <div class="topo-dir">
+      <div class="sinc"><span class="ponto" id="ponto"></span><span id="sincTexto">conectando…</span></div>
+      <span class="eu" id="euSou"></span>
+      <button class="btn" id="btSair">Sair</button>
+    </div>
+  </div>
+  <main>
+    <div class="aviso" id="avisoTopo" hidden></div>
+    <section id="vistaPainel"></section>
+    <section id="vistaPlanilha" hidden></section>
+    <section id="vistaImportar" hidden></section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+const URL_SUPABASE = "https://nmrvetplyzpurjlpkxjn.supabase.co";
+const CHAVE_PUBLICA = "sb_publishable_hHOsWuUGfIGOUBIdz5-0NQ_iDJDfdW1";
+
+const sb = window.supabase.createClient(URL_SUPABASE, CHAVE_PUBLICA, {
+  auth: {persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}
+});
+
+const FRENTES = {
+  rh:"Recursos Humanos", sup:"Suprimentos", eng:"Engenharia", orc:"Orçamentos",
+  fin:"Finanças Corporativas", home:"ACOI Home", proj:"ACOI Projetos", mkt:"Marketing e Comercial"
+};
+const FRENTE_UNIDADE = {rh:"Grupo", sup:"Grupo", eng:"Corp", orc:"Corp", fin:"Grupo", home:"Home", proj:"Projetos", mkt:"Grupo"};
+const STATUS = {
+  "a-fazer":{rotulo:"A fazer", classe:"neutro"},
+  "em-andamento":{rotulo:"Em andamento", classe:"wip"},
+  "concluida":{rotulo:"Concluída", classe:"ok"},
+  "cancelada":{rotulo:"Cancelada", classe:"neutro"}
+};
+const PRIORIDADES = ["a-classificar","quick-win","estruturante","distracao","descartar"];
+const ESFORCOS = ["a-classificar","baixo","medio","alto"];
+const COLUNAS = [
+  {campo:"id", titulo:"ID", classe:"cel-id", tipo:"fixo"},
+  {campo:"tarefa", titulo:"Ação", classe:"cel-tarefa", tipo:"texto-longo"},
+  {campo:"frente", titulo:"Frente", classe:"cel-frente", tipo:"opcao", opcoes:Object.keys(FRENTES)},
+  {campo:"responsavel", titulo:"Responsável", classe:"cel-res", tipo:"texto"},
+  {campo:"prazo", titulo:"Prazo", classe:"cel-prazo", tipo:"data"},
+  {campo:"status", titulo:"Status", classe:"cel-status", tipo:"opcao", opcoes:Object.keys(STATUS)},
+  {campo:"resultado", titulo:"Resultado esperado", classe:"cel-nota", tipo:"texto-longo"},
+  {campo:"prioridade", titulo:"Prioridade", classe:"cel-prio", tipo:"opcao", opcoes:PRIORIDADES},
+  {campo:"esforco", titulo:"Esforço", classe:"cel-prio", tipo:"opcao", opcoes:ESFORCOS},
+  {campo:"notas", titulo:"Notas", classe:"cel-nota", tipo:"texto-longo"}
+];
+const CAMPOS_TABELA = ["id","tarefa","frente","responsavel","prazo","status","resultado","esforco","prioridade","notas","origem"];
+
+const est = {
+  tarefas:new Map(), vista:"painel", podeEditar:false, email:"", nome:"",
+  filtros:{busca:"", frente:"", status:"", responsavel:"", soAtrasadas:false},
+  ordem:{campo:"id", dir:"asc"}, editando:null, importacao:null
+};
+
+const HOJE = new Date().toISOString().slice(0,10);
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function atrasada(t){ return !!t.prazo && t.prazo < HOJE && t.status!=="concluida" && t.status!=="cancelada"; }
+function diasDe(iso){ return Math.round((new Date(iso+"T00:00:00") - new Date(HOJE+"T00:00:00"))/86400000); }
+function dataBr(iso){ if(!iso) return "—"; const p=String(iso).slice(0,10).split("-"); return p.length===3 ? p[2]+"/"+p[1]+"/"+p[0] : iso; }
+function normalizar(s){
+  return String(s==null?"":s).normalize("NFD").replace(/[̀-ͯ]/g,"")
+    .toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+}
+function listaTarefas(){ return Array.from(est.tarefas.values()); }
+function avisar(msg, tipo){
+  const el = $("avisoTopo");
+  if(!msg){ el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = '<span>'+(tipo==="ok"?"✓":"⚠")+'</span><div>'+msg+'</div>';
+}
+
+/* ================= entrada ================= */
+function recado(texto, tipo){
+  const el = $("recadoEntrada");
+  if(!texto){ el.hidden = true; return; }
+  el.hidden = false;
+  el.className = "recado " + (tipo || "info");
+  el.innerHTML = texto;
+}
+
+$("formEntrada").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const email = $("campoEmail").value.trim().toLowerCase();
+  if(!email) return;
+  const bt = $("btEntrar");
+  bt.disabled = true; bt.textContent = "Enviando…";
+  recado("", "info");
+
+  const {error} = await sb.auth.signInWithOtp({
+    email: email,
+    options: {emailRedirectTo: window.location.href.split("#")[0].split("?")[0]}
+  });
+
+  bt.disabled = false; bt.textContent = "Receber link de acesso";
+  if(error){
+    const m = String(error.message || "").toLowerCase();
+    if(m.includes("autorizado") || m.includes("not authorized") || m.includes("database error") || m.includes("unexpected_failure")){
+      recado("<strong>E-mail não autorizado.</strong> Este endereço não está na lista de acesso do plano. Peça ao Igor Rela para incluir você.", "ruim");
+    } else if(m.includes("rate") || m.includes("seconds")){
+      recado("Você pediu links demais em pouco tempo. Espere um minuto e tente de novo.", "ruim");
+    } else {
+      recado("Não consegui enviar o link agora. Tente de novo em instantes.", "ruim");
+    }
+    return;
+  }
+  recado("<strong>Link enviado para "+esc(email)+".</strong> Abra o e-mail e clique para entrar. Se não aparecer em alguns minutos, confira o spam.", "bom");
+});
+
+$("btSair").addEventListener("click", async () => {
+  await sb.auth.signOut();
+  window.location.href = window.location.href.split("#")[0].split("?")[0];
+});
+
+/* ================= arranque ================= */
+async function aoEntrar(sessao){
+  est.email = (sessao.user.email || "").toLowerCase();
+
+  const {data:perfil, error} = await sb.from("perfis").select("nome,papel").limit(1).maybeSingle();
+  if(error || !perfil){
+    $("telaEntrada").hidden = false;
+    $("telaApp").hidden = true;
+    recado("<strong>Acesso não liberado.</strong> Seu login funcionou, mas o e-mail "+esc(est.email)
+      + " não está na lista de quem pode ver o plano. Peça ao Igor Rela para incluir você.", "ruim");
+    await sb.auth.signOut();
+    return;
+  }
+
+  est.nome = perfil.nome || est.email;
+  est.podeEditar = perfil.papel === "editor";
+  $("telaEntrada").hidden = true;
+  $("telaApp").hidden = false;
+  $("euSou").textContent = est.nome + (est.podeEditar ? "" : " · leitura");
+
+  if(!est.podeEditar){
+    avisar("<strong>Somente leitura.</strong> Você acompanha o plano, filtra e exporta, mas as alterações estão reservadas a quem tem permissão de edição.");
+  }
+
+  await carregarTarefas();
+  ligarTempoReal();
+  renderizar();
+}
+
+async function carregarTarefas(){
+  marcarSinc("", "carregando…");
+  const {data, error} = await sb.from("tarefas").select("*").order("id");
+  if(error){
+    marcarSinc("local", "sem conexão");
+    avisar("Não consegui carregar o plano. Recarregue a página. (" + esc(error.message) + ")");
+    return;
+  }
+  est.tarefas.clear();
+  (data || []).forEach(t => est.tarefas.set(t.id, t));
+  marcarSinc("vivo", est.podeEditar ? "sincronizado" : "leitura");
+}
+
+function ligarTempoReal(){
+  sb.channel("tarefas-ao-vivo")
+    .on("postgres_changes", {event:"*", schema:"public", table:"tarefas"}, carga => {
+      if(carga.eventType === "DELETE"){ est.tarefas.delete(carga.old.id); }
+      else { est.tarefas.set(carga.new.id, carga.new); }
+      if(!est.editando) renderizar();
+    })
+    .subscribe();
+}
+
+function marcarSinc(classe, texto){
+  const p = $("ponto");
+  p.className = "ponto" + (classe ? " " + classe : "");
+  $("sincTexto").textContent = texto;
+}
+
+/* ================= gravação ================= */
+function paraBanco(t){
+  const o = {};
+  CAMPOS_TABELA.forEach(c => o[c] = t[c] == null ? "" : String(t[c]));
+  o.prazo = t.prazo ? String(t.prazo).slice(0,10) : null;
+  o.atualizado_em = new Date().toISOString();
+  o.atualizado_por = est.nome || est.email;
+  return o;
+}
+function mensagemErro(e){
+  const m = String((e && e.message) || "").toLowerCase();
+  if(m.includes("row-level security") || m.includes("policy")) return "Você não tem permissão de edição neste plano.";
+  if(m.includes("duplicate") || m.includes("unique")) return "Já existe uma tarefa com esse identificador.";
+  if(m.includes("check constraint")) return "Algum campo ficou com valor fora do permitido.";
+  return "Tente de novo em instantes.";
+}
+
+async function gravar(t){
+  const corpo = paraBanco(t);
+  est.tarefas.set(corpo.id, Object.assign({}, est.tarefas.get(corpo.id) || {}, corpo));
+  renderizar();
+  const {error} = await sb.from("tarefas").upsert(corpo);
+  if(error){ avisar("Não salvei a tarefa " + esc(corpo.id) + ". " + esc(mensagemErro(error))); await carregarTarefas(); renderizar(); }
+}
+async function apagar(id){
+  est.tarefas.delete(id);
+  renderizar();
+  const {error} = await sb.from("tarefas").delete().eq("id", id);
+  if(error){ avisar("Não excluí a tarefa " + esc(id) + ". " + esc(mensagemErro(error))); await carregarTarefas(); renderizar(); }
+}
+
+/* ================= painel ================= */
+function resumo(){
+  const ts = listaTarefas();
+  const r = {total:ts.length, concluidas:0, andamento:0, aFazer:0, canceladas:0, atrasadas:[], vencendo:[], semDono:0, semPrazo:0};
+  ts.forEach(t => {
+    if(t.status==="concluida") r.concluidas++;
+    else if(t.status==="em-andamento") r.andamento++;
+    else if(t.status==="cancelada") r.canceladas++;
+    else r.aFazer++;
+    if(atrasada(t)) r.atrasadas.push(t);
+    else if(t.prazo && t.status!=="concluida" && t.status!=="cancelada"){
+      const d = diasDe(String(t.prazo).slice(0,10));
+      if(d >= 0 && d <= 14) r.vencendo.push(t);
+    }
+    const dono = (t.responsavel||"").trim().toLowerCase();
+    if(!dono || dono==="a-definir" || dono==="a definir") r.semDono++;
+    if(!t.prazo) r.semPrazo++;
+  });
+  const porPrazo = (a,b) => String(a.prazo).localeCompare(String(b.prazo));
+  r.atrasadas.sort(porPrazo); r.vencendo.sort(porPrazo);
+  return r;
+}
+
+function renderPainel(){
+  const r = resumo();
+  const vivas = r.total - r.canceladas;
+  const pct = vivas ? Math.round(r.concluidas/vivas*100) : 0;
+  const kpis = [
+    {c:"", rot:"Tarefas no plano", v:r.total, n:(r.canceladas ? r.canceladas+" canceladas" : "todas ativas")},
+    {c:"ok", rot:"Concluídas", v:r.concluidas, n:pct+"% do que está ativo"},
+    {c:"wip", rot:"Em andamento", v:r.andamento, n:"com alguém tocando agora"},
+    {c:"", rot:"A fazer", v:r.aFazer, n:"ainda não começaram"},
+    {c:"late", rot:"Atrasadas", v:r.atrasadas.length, n:"prazo venceu e não fechou"},
+    {c:"", rot:"Vencem em 14 dias", v:r.vencendo.length, n:"entram na fila agora"}
+  ];
+
+  const pf = {};
+  listaTarefas().forEach(t => {
+    const f = t.frente || "outros";
+    pf[f] = pf[f] || {total:0, ok:0, wip:0, late:0};
+    const g = pf[f]; g.total++;
+    if(t.status==="concluida") g.ok++;
+    else if(atrasada(t)) g.late++;
+    else if(t.status==="em-andamento") g.wip++;
+  });
+  const linhasFrente = Object.keys(pf).sort((a,b)=>pf[b].total-pf[a].total).map(f => {
+    const g = pf[f], p = n => (n/g.total*100).toFixed(2)+"%";
+    return '<div class="frente"><div class="nome">'+esc(FRENTES[f]||f)
+      + '<small>'+esc(FRENTE_UNIDADE[f]||"")+' · '+g.total+' tarefas</small></div>'
+      + '<div class="barra" role="img" aria-label="'+g.ok+' concluídas, '+g.wip+' em andamento, '+g.late+' atrasadas, de '+g.total+'">'
+      + (g.ok?'<i class="ok" style="width:'+p(g.ok)+'"></i>':"")
+      + (g.wip?'<i class="wip" style="width:'+p(g.wip)+'"></i>':"")
+      + (g.late?'<i class="late" style="width:'+p(g.late)+'"></i>':"")
+      + '</div><div class="pct">'+Math.round(g.ok/g.total*100)+'%<small>'+g.ok+' de '+g.total+'</small></div></div>';
+  }).join("");
+
+  const item = (t, dir) => '<div class="linha" data-ir="'+esc(t.id)+'" tabindex="0" role="button">'
+    + '<div class="corpo"><div class="t">'+esc(t.tarefa)+'</div><div class="m"><span class="mono">'+esc(t.id)+'</span>'
+    + '<span>'+esc(FRENTES[t.frente]||t.frente)+'</span><span>'+esc(t.responsavel||"sem dono")+'</span></div></div>'
+    + '<div class="dir">'+dir+'</div></div>';
+
+  const lAtraso = r.atrasadas.length ? r.atrasadas.slice(0,40).map(t => item(t,
+      '<span style="color:var(--late)">'+Math.abs(diasDe(String(t.prazo).slice(0,10)))+' dias</span><br>'
+      + '<span style="font-weight:400;color:var(--ink-3)" class="mono">'+dataBr(t.prazo)+'</span>')).join("")
+    : '<div class="vazio">Nenhuma tarefa com prazo vencido. Bom sinal.</div>';
+  const lVence = r.vencendo.length ? r.vencendo.slice(0,40).map(t => {
+      const d = diasDe(String(t.prazo).slice(0,10));
+      return item(t, '<span>'+(d===0?"hoje":"em "+d+"d")+'</span><br><span style="font-weight:400;color:var(--ink-3)" class="mono">'+dataBr(t.prazo)+'</span>');
+    }).join("")
+    : '<div class="vazio">Nada vencendo nos próximos 14 dias.</div>';
+
+  $("vistaPainel").innerHTML =
+      '<div class="kpis">' + kpis.map(k => '<div class="kpi '+k.c+'"><span class="faixa"></span>'
+        + '<div class="rotulo">'+esc(k.rot)+'</div><div class="valor mono">'+k.v+'</div><div class="nota">'+esc(k.n)+'</div></div>').join("") + '</div>'
+    + '<div class="secao-titulo">Andamento por frente</div>'
+    + '<div class="legenda"><span><i class="chave" style="background:var(--ok)"></i>Concluída</span>'
+      + '<span><i class="chave" style="background:var(--wip)"></i>Em andamento</span>'
+      + '<span><i class="chave" style="background:var(--late)"></i>Atrasada</span>'
+      + '<span><i class="chave" style="background:var(--track)"></i>A fazer, no prazo</span></div>'
+    + '<div class="frentes">'+linhasFrente+'</div>'
+    + '<div class="secao-titulo">O que precisa de decisão</div>'
+    + '<div class="duas">'
+      + '<div class="cartao"><header><h3>Atrasadas</h3><span class="conta">'+r.atrasadas.length+'</span></header>'+lAtraso+'</div>'
+      + '<div class="cartao"><header><h3>Vencem em até 14 dias</h3><span class="conta">'+r.vencendo.length+'</span></header>'+lVence+'</div>'
+    + '</div>'
+    + '<div class="secao-titulo">Qualidade do plano</div>'
+    + '<div class="painel"><p>O curso é explícito nisso: ação sem dono e sem data para terminar não é plano de ação, é intenção. Estes dois números medem o quanto do plano ainda está nesse estado.</p>'
+      + '<div class="difs"><div class="dif"><div class="n mono">'+r.semDono+'</div><div class="r">sem dono de nome próprio<br><small style="color:var(--ink-3)">estão como área ou vazias</small></div></div>'
+      + '<div class="dif"><div class="n mono">'+r.semPrazo+'</div><div class="r">sem data de término<br><small style="color:var(--ink-3)">a planilha dizia só &ldquo;60 dias&rdquo;</small></div></div></div></div>';
+
+  $("vistaPainel").querySelectorAll("[data-ir]").forEach(el => {
+    const ir = () => { est.filtros.busca = el.dataset.ir; trocarVista("planilha"); };
+    el.addEventListener("click", ir);
+    el.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); ir(); } });
+  });
+}
+
+/* ================= planilha ================= */
+function filtrar(){
+  const f = est.filtros, busca = normalizar(f.busca);
+  const ts = listaTarefas().filter(t => {
+    if(f.frente && t.frente !== f.frente) return false;
+    if(f.status){
+      if(f.status === "atrasada"){ if(!atrasada(t)) return false; }
+      else if(t.status !== f.status) return false;
+    }
+    if(f.responsavel && t.responsavel !== f.responsavel) return false;
+    if(f.soAtrasadas && !atrasada(t)) return false;
+    if(busca && !normalizar([t.id,t.tarefa,t.responsavel,t.resultado,t.notas].join(" ")).includes(busca)) return false;
+    return true;
+  });
+  const {campo, dir} = est.ordem;
+  ts.sort((a,b) => {
+    const va = String(a[campo]==null?"":a[campo]), vb = String(b[campo]==null?"":b[campo]);
+    if(!va && vb) return 1;
+    if(va && !vb) return -1;
+    const c = va.localeCompare(vb, "pt-BR", {numeric:true});
+    return dir==="asc" ? c : -c;
+  });
+  return ts;
+}
+
+function renderPlanilha(){
+  const ts = filtrar();
+  const donos = Array.from(new Set(listaTarefas().map(t=>t.responsavel).filter(Boolean))).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  const opc = (lista, sel, rot) => lista.map(v => '<option value="'+esc(v)+'"'+(v===sel?" selected":"")+'>'+esc(rot?rot(v):v)+'</option>').join("");
+
+  const cab = COLUNAS.map(c => '<th data-ordenar="'+c.campo+'">'+esc(c.titulo)
+    + (est.ordem.campo===c.campo ? '<span class="seta">'+(est.ordem.dir==="asc"?"↑":"↓")+'</span>' : "") + '</th>').join("")
+    + (est.podeEditar ? '<th style="width:38px" aria-label="Excluir"></th>' : "");
+
+  const corpo = ts.length ? ts.map(t => {
+    const celulas = COLUNAS.map(c => {
+      let v;
+      if(c.campo === "status"){
+        v = atrasada(t) ? '<span class="selo late">Atrasada</span>'
+          : '<span class="selo '+(STATUS[t.status]||STATUS["a-fazer"]).classe+'">'+esc((STATUS[t.status]||STATUS["a-fazer"]).rotulo)+'</span>';
+      } else if(c.campo === "frente"){ v = esc(FRENTES[t.frente]||t.frente||"—"); }
+      else if(c.campo === "prazo"){ v = t.prazo ? dataBr(t.prazo) : '<span style="color:var(--ink-3)">sem data</span>'; }
+      else if(c.campo === "responsavel"){
+        const x = (t.responsavel||"").trim();
+        v = (!x || x==="a-definir") ? '<span style="color:var(--late)">a definir</span>' : esc(x);
+      } else if(c.campo==="prioridade" || c.campo==="esforco"){
+        const x = t[c.campo] || "a-classificar";
+        v = x==="a-classificar" ? '<span style="color:var(--ink-3)">—</span>' : esc(x.replace("-"," "));
+      } else { v = esc(t[c.campo]||"") || '<span style="color:var(--ink-3)">—</span>'; }
+      const ed = (c.tipo!=="fixo" && est.podeEditar) ? ' data-editar="'+esc(c.campo)+'"' : "";
+      return '<td class="'+c.classe+'"'+ed+' data-id="'+esc(t.id)+'">'+v+'</td>';
+    }).join("");
+    return '<tr'+(atrasada(t)?' class="risco"':"")+' data-linha="'+esc(t.id)+'">'+celulas
+      + (est.podeEditar ? '<td style="text-align:center"><button class="acao-linha" data-apagar="'+esc(t.id)+'" aria-label="Excluir tarefa '+esc(t.id)+'">×</button></td>' : "")
+      + '</tr>';
+  }).join("") : '<tr><td colspan="'+(COLUNAS.length+1)+'"><div class="vazio">Nenhuma tarefa bate com esses filtros.</div></td></tr>';
+
+  $("vistaPlanilha").innerHTML =
+      '<div class="filtros">'
+    + '<input type="search" id="fBusca" placeholder="Buscar em ação, responsável, notas…" value="'+esc(est.filtros.busca)+'" aria-label="Buscar">'
+    + '<select id="fFrente" aria-label="Filtrar por frente"><option value="">Todas as frentes</option>'+opc(Object.keys(FRENTES), est.filtros.frente, v=>FRENTES[v])+'</select>'
+    + '<select id="fStatus" aria-label="Filtrar por status"><option value="">Todos os status</option>'+opc(Object.keys(STATUS), est.filtros.status, v=>STATUS[v].rotulo)
+      + '<option value="atrasada"'+(est.filtros.status==="atrasada"?" selected":"")+'>Atrasada</option></select>'
+    + '<select id="fDono" aria-label="Filtrar por responsável"><option value="">Todos os responsáveis</option>'+opc(donos, est.filtros.responsavel)+'</select>'
+    + '<button class="chip" id="fAtraso" aria-pressed="'+(est.filtros.soAtrasadas?"true":"false")+'">Só atrasadas</button>'
+    + (est.podeEditar ? '<button class="btn primario" id="btNova">+ Nova tarefa</button>' : "")
+    + '<span class="contagem">'+ts.length+' de '+est.tarefas.size+'</span></div>'
+    + '<div class="grade-caixa"><table class="grade"><thead><tr>'+cab+'</tr></thead><tbody>'+corpo+'</tbody></table></div>';
+
+  const raiz = $("vistaPlanilha");
+  let tmr;
+  raiz.querySelector("#fBusca").addEventListener("input", e => {
+    clearTimeout(tmr); const v = e.target.value;
+    tmr = setTimeout(() => {
+      est.filtros.busca = v; renderPlanilha();
+      const b = $("fBusca"); if(b){ b.focus(); b.setSelectionRange(b.value.length, b.value.length); }
+    }, 220);
+  });
+  raiz.querySelector("#fFrente").addEventListener("change", e => { est.filtros.frente = e.target.value; renderPlanilha(); });
+  raiz.querySelector("#fStatus").addEventListener("change", e => { est.filtros.status = e.target.value; renderPlanilha(); });
+  raiz.querySelector("#fDono").addEventListener("change", e => { est.filtros.responsavel = e.target.value; renderPlanilha(); });
+  raiz.querySelector("#fAtraso").addEventListener("click", () => { est.filtros.soAtrasadas = !est.filtros.soAtrasadas; renderPlanilha(); });
+  const bn = raiz.querySelector("#btNova"); if(bn) bn.addEventListener("click", novaTarefa);
+  raiz.querySelectorAll("th[data-ordenar]").forEach(th => th.addEventListener("click", () => {
+    const c = th.dataset.ordenar;
+    if(est.ordem.campo === c) est.ordem.dir = est.ordem.dir==="asc" ? "desc" : "asc";
+    else est.ordem = {campo:c, dir:"asc"};
+    renderPlanilha();
+  }));
+  raiz.querySelectorAll("td[data-editar]").forEach(td => td.addEventListener("click", () => abrirEdicao(td)));
+  raiz.querySelectorAll("[data-apagar]").forEach(b => b.addEventListener("click", ev => {
+    ev.stopPropagation();
+    const t = est.tarefas.get(b.dataset.apagar);
+    if(t && confirm('Excluir a tarefa "'+String(t.tarefa).slice(0,80)+'"?\n\nA linha some do painel para todo mundo.')) apagar(t.id);
+  }));
+}
+
+function abrirEdicao(td){
+  if(est.editando || !est.podeEditar) return;
+  const campo = td.dataset.editar, id = td.dataset.id;
+  const t = est.tarefas.get(id);
+  if(!t) return;
+  const col = COLUNAS.find(c => c.campo === campo);
+  const valor = campo==="prazo" ? (t.prazo ? String(t.prazo).slice(0,10) : "") : (t[campo] || "");
+  let el;
+  if(col.tipo === "opcao"){
+    el = document.createElement("select");
+    col.opcoes.forEach(o => {
+      const op = document.createElement("option");
+      op.value = o;
+      op.textContent = campo==="status" ? STATUS[o].rotulo : (campo==="frente" ? FRENTES[o] : o.replace("-"," "));
+      if(o === valor) op.selected = true;
+      el.appendChild(op);
+    });
+  } else if(col.tipo === "data"){ el = document.createElement("input"); el.type = "date"; el.value = valor; }
+  else if(col.tipo === "texto-longo"){ el = document.createElement("textarea"); el.value = valor; }
+  else { el = document.createElement("input"); el.type = "text"; el.value = valor; }
+  el.className = "editando";
+  est.editando = {id, campo};
+  td.innerHTML = ""; td.appendChild(el); el.focus();
+  if(el.select && col.tipo !== "data") el.select();
+
+  let fechado = false;
+  const confirmar = salvar => {
+    if(fechado) return;
+    fechado = true; est.editando = null;
+    const novo = salvar ? el.value : valor;
+    if(salvar && novo !== valor){
+      const atual = est.tarefas.get(id);
+      if(atual){ const copia = Object.assign({}, atual); copia[campo] = novo; gravar(copia); return; }
+    }
+    renderPlanilha();
+  };
+  el.addEventListener("blur", () => confirmar(true));
+  el.addEventListener("keydown", e => {
+    if(e.key === "Escape"){ e.preventDefault(); confirmar(false); }
+    else if(e.key === "Enter" && (col.tipo !== "texto-longo" || e.metaKey || e.ctrlKey)){ e.preventDefault(); confirmar(true); }
+  });
+  if(col.tipo === "opcao") el.addEventListener("change", () => confirmar(true));
+}
+
+function novoId(frente){
+  const pre = frente || "nova";
+  let n = 1;
+  while(est.tarefas.has(pre+"-"+String(n).padStart(2,"0"))) n++;
+  return pre+"-"+String(n).padStart(2,"0");
+}
+async function novaTarefa(){
+  const frente = est.filtros.frente || "rh";
+  const t = {id:novoId(frente), tarefa:"Nova tarefa — descreva a ação", frente:frente, responsavel:"a-definir",
+    prazo:"", status:"a-fazer", resultado:"", esforco:"a-classificar", prioridade:"a-classificar",
+    notas:"", origem:"criada no painel em "+dataBr(HOJE)};
+  await gravar(t);
+  est.ordem = {campo:"id", dir:"asc"};
+  renderPlanilha();
+  const linha = document.querySelector('tr[data-linha="'+t.id+'"]');
+  if(linha){
+    linha.scrollIntoView({block:"center", behavior:"smooth"});
+    const cel = linha.querySelector('td[data-editar="tarefa"]');
+    if(cel) abrirEdicao(cel);
+  }
+}
+
+/* ================= importar e exportar ================= */
+const MAPA_STATUS = {
+  "realizado":"concluida","concluido":"concluida","concluida":"concluida","finalizado":"concluida",
+  "em andamento":"em-andamento","andamento":"em-andamento","em execucao":"em-andamento",
+  "aguardando":"a-fazer","a fazer":"a-fazer","nao iniciado":"a-fazer","pendente":"a-fazer",
+  "atrasado":"a-fazer","atrasada":"a-fazer","cancelado":"cancelada","cancelada":"cancelada"
+};
+function paraIso(v){
+  if(v == null || v === "") return {iso:"", texto:""};
+  if(v instanceof Date && !isNaN(v)) return {iso:new Date(v.getTime()-v.getTimezoneOffset()*60000).toISOString().slice(0,10), texto:""};
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return {iso:m[1]+"-"+m[2]+"-"+m[3], texto:""};
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m){
+    const ano = +m[3], mes = +m[2];
+    for(const dia of [+m[1], 30, 28]){
+      const d = new Date(Date.UTC(ano, mes-1, dia));
+      if(d.getUTCMonth() === mes-1 && d.getUTCDate() === dia)
+        return {iso:d.toISOString().slice(0,10), texto:(+m[1] !== dia ? "prazo na planilha era "+s : "")};
+    }
+  }
+  return {iso:"", texto:s};
+}
+function lerPlanilhaG4(linhas){
+  let iCab = -1;
+  for(let i = 0; i < Math.min(linhas.length, 30); i++){
+    const t = linhas[i].map(c => normalizar(c));
+    if(t.some(c => c === "acao") && t.some(c => c.includes("responsavel"))){ iCab = i; break; }
+  }
+  if(iCab < 0) return null;
+  const cab = linhas[iCab].map(c => normalizar(c));
+  const iAcao = cab.findIndex(c => c === "acao"), iRes = cab.findIndex(c => c.includes("resultado")),
+        iResp = cab.findIndex(c => c.includes("responsavel")), iPrazo = cab.findIndex(c => c === "prazo"),
+        iStatus = cab.findIndex(c => c.includes("status")), iObs = cab.findIndex(c => c.includes("observa")),
+        iNovo = cab.findIndex(c => c.includes("novo prazo"));
+  const CHAVES = {"recursos humanos":"rh","suprimentos":"sup","engenharia":"eng","orcamento":"orc",
+    "financas":"fin","home":"home","projetos":"proj","marketing":"mkt","comercial":"mkt"};
+  const saida = []; let frente = null;
+  for(let i = iCab+1; i < linhas.length; i++){
+    const L = linhas[i];
+    const acao = String(L[iAcao]==null?"":L[iAcao]).trim();
+    const up = normalizar(acao);
+    if(up.startsWith("plano tatico") || up.startsWith("plano de acao")){
+      frente = null;
+      for(const k in CHAVES){ if(up.includes(k)){ frente = CHAVES[k]; break; } }
+      continue;
+    }
+    const resultado = iRes>=0 ? String(L[iRes]==null?"":L[iRes]).trim() : "";
+    if((!acao && !resultado) || !frente) continue;
+    const resp = iResp>=0 ? String(L[iResp]==null?"":L[iResp]).trim() : "";
+    const st = iStatus>=0 ? String(L[iStatus]==null?"":L[iStatus]).trim() : "";
+    const p = paraIso(iPrazo>=0 ? L[iPrazo] : ""), np = paraIso(iNovo>=0 ? L[iNovo] : "");
+    if(!resp && !st && !resultado && !p.iso && !p.texto && !np.iso) continue;
+    const notas = [];
+    let prazo = p.iso;
+    if(np.iso){ if(p.iso) notas.push("prazo original na planilha era "+p.iso+", repactuado para "+np.iso); prazo = np.iso; }
+    else if(p.iso && p.texto) notas.push(p.texto);
+    else if(p.texto) notas.push("prazo na planilha: “"+p.texto+"”, sem data-base declarada");
+    const stn = normalizar(st);
+    if(stn === "atrasado" || stn === "atrasada") notas.push("marcada como Atrasado na planilha de origem");
+    const obs = iObs>=0 ? String(L[iObs]==null?"":L[iObs]).trim() : "";
+    if(obs) notas.push("obs. da planilha: "+obs);
+    saida.push({tarefa:acao||resultado, frente:frente, responsavel:resp||"a-definir", prazo:prazo,
+      status:MAPA_STATUS[stn]||"a-fazer", resultado:acao?resultado:"", notas:notas.join("; ")});
+  }
+  return saida.length ? saida : null;
+}
+function lerPlanilhaPainel(linhas){
+  const iCab = linhas.findIndex(L => { const t = L.map(c=>normalizar(c)); return t.includes("id") && t.includes("tarefa"); });
+  if(iCab < 0) return null;
+  const cab = linhas[iCab].map(c => normalizar(c));
+  const idx = {};
+  ["id","tarefa","frente","responsavel","prazo","status","resultado","esforco","prioridade","notas"].forEach(c => idx[c] = cab.indexOf(c));
+  const saida = [];
+  for(let i = iCab+1; i < linhas.length; i++){
+    const L = linhas[i];
+    const tarefa = idx.tarefa>=0 ? String(L[idx.tarefa]==null?"":L[idx.tarefa]).trim() : "";
+    if(!tarefa) continue;
+    const o = {tarefa:tarefa};
+    ["id","frente","responsavel","status","resultado","esforco","prioridade","notas"].forEach(c => {
+      o[c] = idx[c]>=0 ? String(L[idx[c]]==null?"":L[idx[c]]).trim() : "";
+    });
+    o.prazo = paraIso(idx.prazo>=0 ? L[idx.prazo] : "").iso;
+    o.status = STATUS[o.status] ? o.status : (MAPA_STATUS[normalizar(o.status)] || "a-fazer");
+    saida.push(o);
+  }
+  return saida.length ? saida : null;
+}
+function compararComPlano(novas){
+  const porChave = new Map();
+  listaTarefas().sort((a,b)=>String(a.id).localeCompare(String(b.id),"pt-BR",{numeric:true})).forEach(t => {
+    const k = normalizar(t.tarefa);
+    if(!porChave.has(k)) porChave.set(k, []);
+    porChave.get(k).push(t);
+  });
+  const vistos = new Set();
+  const res = {novas:[], mudadas:[], iguais:0, sumidas:[]};
+  const CAMPOS = [{c:"responsavel",r:"Responsável"},{c:"prazo",r:"Prazo"},{c:"status",r:"Status"},
+                  {c:"resultado",r:"Resultado esperado"},{c:"notas",r:"Notas"}];
+  novas.forEach(n => {
+    const fila = porChave.get(normalizar(n.tarefa));
+    let atual = (fila && fila.length) ? fila.shift() : null;
+    if(!atual && n.id){ const pid = est.tarefas.get(n.id); if(pid && !vistos.has(pid.id)) atual = pid; }
+    if(!atual){ res.novas.push(n); return; }
+    vistos.add(atual.id);
+    const difs = [];
+    CAMPOS.forEach(({c,r}) => {
+      const de = c==="prazo" ? (atual.prazo ? String(atual.prazo).slice(0,10) : "") : String(atual[c]==null?"":atual[c]).trim();
+      const para = String(n[c]==null?"":n[c]).trim();
+      if(para && de !== para) difs.push({campo:c, rotulo:r, de:de, para:para});
+    });
+    if(difs.length) res.mudadas.push({atual:atual, novo:n, difs:difs});
+    else res.iguais++;
+  });
+  listaTarefas().forEach(t => { if(!vistos.has(t.id)) res.sumidas.push(t); });
+  return res;
+}
+function lerCsv(texto){
+  if(texto.charCodeAt(0) === 0xFEFF) texto = texto.slice(1);
+  const cab1 = texto.split("\n")[0];
+  const sep = cab1.split(";").length > cab1.split(",").length ? ";" : ",";
+  const linhas = []; let campo = "", linha = [], aspas = false;
+  for(let i = 0; i < texto.length; i++){
+    const c = texto[i];
+    if(aspas){ if(c === '"'){ if(texto[i+1] === '"'){ campo += '"'; i++; } else aspas = false; } else campo += c; }
+    else if(c === '"') aspas = true;
+    else if(c === sep){ linha.push(campo); campo = ""; }
+    else if(c === "\n"){ linha.push(campo); linhas.push(linha); linha = []; campo = ""; }
+    else if(c !== "\r") campo += c;
+  }
+  if(campo || linha.length){ linha.push(campo); linhas.push(linha); }
+  return linhas;
+}
+
+function renderImportar(){
+  const imp = est.importacao;
+  let bloco = "";
+  if(imp){
+    const corta = v => v ? esc(String(v).length > 90 ? String(v).slice(0,90)+"…" : v) : "<em style='color:var(--ink-3)'>vazio</em>";
+    const lMud = imp.mudadas.slice(0,120).map(m =>
+      '<div class="mud-linha"><div class="cab"><span class="mono" style="color:var(--ink-3);font-size:11.5px">'+esc(m.atual.id)+'</span>'
+      + '<strong style="font-size:12.5px">'+esc(String(m.atual.tarefa).slice(0,110))+'</strong></div>'
+      + m.difs.map(d => '<div class="campo-mud"><b>'+esc(d.rotulo)+':</b> <span class="de">'
+          + (d.campo==="prazo" ? esc(dataBr(d.de)) : corta(d.de)) + '</span> → <span class="para">'
+          + (d.campo==="prazo" ? esc(dataBr(d.para)) : corta(d.para)) + '</span></div>').join("") + '</div>').join("");
+    const lNovas = imp.novas.slice(0,60).map(n =>
+      '<div class="mud-linha"><div class="cab"><span class="selo neutro">nova</span>'
+      + '<strong style="font-size:12.5px">'+esc(String(n.tarefa).slice(0,110))+'</strong></div>'
+      + '<div class="campo-mud">'+esc(FRENTES[n.frente]||n.frente||"sem frente")+' · '+esc(n.responsavel||"sem dono")
+      + ' · '+esc(n.prazo?dataBr(n.prazo):"sem prazo")+'</div></div>').join("");
+
+    bloco = '<div class="painel"><h3>O que mudou em relação ao painel</h3>'
+      + '<p>Comparei linha a linha pelo texto da ação. Confira antes de aplicar — depois de aplicar, todo mundo que abrir o painel vê o resultado.</p>'
+      + '<div class="difs">'
+        + '<div class="dif nova"><div class="n mono">'+imp.novas.length+'</div><div class="r">ações novas</div></div>'
+        + '<div class="dif mud"><div class="n mono">'+imp.mudadas.length+'</div><div class="r">com alteração</div></div>'
+        + '<div class="dif"><div class="n mono">'+imp.iguais+'</div><div class="r">sem mudança</div></div>'
+        + '<div class="dif sumiu"><div class="n mono">'+imp.sumidas.length+'</div><div class="r">só no painel<br><small style="color:var(--ink-3)">não vieram no arquivo</small></div></div></div>'
+      + (est.podeEditar
+          ? '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px">'
+            + '<button class="btn primario" id="btAplicar">Aplicar '+(imp.novas.length+imp.mudadas.length)+' mudanças</button>'
+            + '<button class="btn" id="btDescartar">Descartar</button></div>'
+          : '<div class="aviso" style="margin-bottom:14px"><span>⚠</span><div>Você pode conferir a comparação, mas aplicar mudanças exige permissão de edição.</div></div>')
+      + '<div class="progresso" id="progresso" hidden><i style="width:0"></i></div>'
+      + ((imp.mudadas.length || imp.novas.length) ? '<div class="mudancas">'+lMud+lNovas+'</div>'
+          : '<div class="vazio">O arquivo não traz nada diferente do que já está no painel.</div>')
+      + (imp.sumidas.length ? '<p style="margin-top:14px;font-size:12.5px">As '+imp.sumidas.length+' tarefas que estão no painel e não vieram no arquivo <strong>não são apagadas</strong>. Se alguma deve sair, exclua pela planilha.</p>' : "")
+      + '</div>';
+  }
+
+  $("vistaImportar").innerHTML =
+      '<div class="painel"><h3>Subir uma versão da planilha</h3>'
+    + '<p>Aceita o arquivo do PMO no formato da G4 (colunas Ação, Resultado esperado, Responsável, Prazo, Status) e também a planilha exportada por este painel. Nada é gravado antes de você conferir a comparação.</p>'
+    + '<div class="solta" id="solta"><button class="btn primario" id="btEscolher">Escolher arquivo</button>'
+    + '<div class="dica">ou arraste aqui · .xlsx, .xls ou .csv</div>'
+    + '<input type="file" id="arquivo" accept=".xlsx,.xls,.csv" hidden></div>'
+    + '<div id="erroArquivo" style="margin-top:12px" hidden></div></div>'
+    + bloco
+    + '<div class="painel"><h3>Exportar</h3>'
+    + '<p>A planilha sai em Excel de verdade, com as colunas já dimensionadas e a primeira linha congelada. O CSV serve para quem prefere abrir em outro programa.</p>'
+    + '<div style="display:flex;gap:9px;flex-wrap:wrap">'
+      + '<button class="btn primario" id="btXlsx">Baixar Excel (.xlsx)</button>'
+      + '<button class="btn" id="btCsv">Baixar CSV</button></div></div>';
+
+  const raiz = $("vistaImportar");
+  const entrada = raiz.querySelector("#arquivo"), solta = raiz.querySelector("#solta");
+  raiz.querySelector("#btEscolher").addEventListener("click", () => entrada.click());
+  entrada.addEventListener("change", e => { if(e.target.files[0]) processarArquivo(e.target.files[0]); });
+  ["dragenter","dragover"].forEach(ev => solta.addEventListener(ev, e => { e.preventDefault(); solta.classList.add("sobre"); }));
+  ["dragleave","drop"].forEach(ev => solta.addEventListener(ev, e => { e.preventDefault(); solta.classList.remove("sobre"); }));
+  solta.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if(f) processarArquivo(f); });
+  const ap = raiz.querySelector("#btAplicar"); if(ap) ap.addEventListener("click", aplicarImportacao);
+  const de = raiz.querySelector("#btDescartar"); if(de) de.addEventListener("click", () => { est.importacao = null; renderImportar(); });
+  raiz.querySelector("#btXlsx").addEventListener("click", exportarXlsx);
+  raiz.querySelector("#btCsv").addEventListener("click", exportarCsv);
+}
+
+function erroArquivo(msg){
+  const el = $("erroArquivo");
+  if(!el) return;
+  el.hidden = false;
+  el.innerHTML = '<div class="aviso" style="margin:0"><span>⚠</span><div>'+esc(msg)+'</div></div>';
+}
+function processarArquivo(file){
+  const nome = file.name.toLowerCase(), leitor = new FileReader();
+  leitor.onerror = () => erroArquivo("Não consegui ler o arquivo. Salve de novo e tente outra vez.");
+  leitor.onload = ev => {
+    let linhas = null;
+    try {
+      if(nome.endsWith(".csv")) linhas = lerCsv(new TextDecoder("utf-8").decode(ev.target.result));
+      else {
+        if(typeof XLSX === "undefined"){
+          erroArquivo("A biblioteca que lê Excel não carregou. Confira sua conexão, recarregue a página, ou salve a planilha como CSV e suba de novo.");
+          return;
+        }
+        const wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array", cellDates:true});
+        const aba = wb.SheetNames[wb.SheetNames.length-1];
+        linhas = XLSX.utils.sheet_to_json(wb.Sheets[aba], {header:1, raw:false, dateNF:"yyyy-mm-dd", defval:""});
+      }
+    } catch(e){ erroArquivo("Não consegui abrir esse arquivo. Confira se é mesmo .xlsx, .xls ou .csv."); return; }
+    if(!linhas || !linhas.length){ erroArquivo("O arquivo abriu vazio."); return; }
+    const lidas = lerPlanilhaG4(linhas) || lerPlanilhaPainel(linhas);
+    if(!lidas){
+      erroArquivo("Não reconheci as colunas dessa planilha. Ela precisa ter cabeçalho com Ação e Responsável (formato do PMO), ou id e tarefa (formato deste painel). Se tem várias abas, o painel lê a última.");
+      return;
+    }
+    const dif = compararComPlano(lidas);
+    dif.arquivo = file.name; dif.lidas = lidas.length;
+    est.importacao = dif;
+    renderImportar();
+  };
+  leitor.readAsArrayBuffer(file);
+}
+
+async function aplicarImportacao(){
+  const imp = est.importacao;
+  if(!imp || !est.podeEditar) return;
+  const bt = $("btAplicar"), barra = $("progresso");
+  bt.disabled = true; bt.textContent = "Aplicando…"; barra.hidden = false;
+
+  const trabalho = [];
+  imp.mudadas.forEach(m => {
+    const copia = Object.assign({}, est.tarefas.get(m.atual.id) || m.atual);
+    m.difs.forEach(d => { copia[d.campo] = d.para; });
+    trabalho.push(paraBanco(copia));
+  });
+  imp.novas.forEach(n => {
+    trabalho.push(paraBanco(Object.assign({}, n, {
+      id: (n.id && !est.tarefas.has(n.id)) ? n.id : novoId(n.frente || "nova"),
+      esforco: n.esforco || "a-classificar",
+      prioridade: n.prioridade || "a-classificar",
+      origem: "importada de " + imp.arquivo + " em " + dataBr(HOJE)
+    })));
+  });
+
+  let gravadas = 0, falhas = 0;
+  const LOTE = 60;
+  for(let i = 0; i < trabalho.length; i += LOTE){
+    const parte = trabalho.slice(i, i+LOTE);
+    const {error} = await sb.from("tarefas").upsert(parte);
+    if(error) falhas += parte.length; else gravadas += parte.length;
+    const b = barra.querySelector("i");
+    if(b) b.style.width = ((i+parte.length)/trabalho.length*100)+"%";
+    bt.textContent = "Aplicando " + Math.min(i+LOTE, trabalho.length) + " de " + trabalho.length + "…";
+  }
+
+  await sb.from("importacoes").insert({
+    arquivo: imp.arquivo, por: est.nome || est.email, linhas_lidas: imp.lidas,
+    novas: imp.novas.length, alteradas: imp.mudadas.length, sem_mudanca: imp.iguais, falhas: falhas
+  });
+
+  est.importacao = null;
+  await carregarTarefas();
+  renderizar();
+  avisar(falhas
+    ? esc(falhas + " de " + trabalho.length + " tarefas não foram gravadas. Confira se você tem permissão de edição.")
+    : "<strong>Pronto.</strong> " + gravadas + " tarefas atualizadas a partir de " + esc(imp.arquivo) + ".", falhas ? "" : "ok");
+}
+
+function linhasParaExportar(){
+  return listaTarefas()
+    .sort((a,b) => String(a.id).localeCompare(String(b.id), "pt-BR", {numeric:true}))
+    .map(t => ({
+      id:t.id, tarefa:t.tarefa, frente:FRENTES[t.frente]||t.frente, responsavel:t.responsavel,
+      prazo:t.prazo ? String(t.prazo).slice(0,10) : "",
+      status:(STATUS[t.status]||{}).rotulo || t.status,
+      atrasada: atrasada(t) ? "sim" : "nao",
+      resultado:t.resultado, esforco:t.esforco, prioridade:t.prioridade,
+      notas:t.notas, origem:t.origem,
+      atualizado_em:t.atualizado_em ? String(t.atualizado_em).slice(0,10) : "",
+      atualizado_por:t.atualizado_por || ""
+    }));
+}
+function exportarXlsx(){
+  if(typeof XLSX === "undefined"){ avisar("A biblioteca de Excel não carregou. Use o CSV ou recarregue a página."); return; }
+  const dados = linhasParaExportar();
+  const aba = XLSX.utils.json_to_sheet(dados, {header:["id","tarefa","frente","responsavel","prazo","status","atrasada","resultado","esforco","prioridade","notas","origem","atualizado_em","atualizado_por"]});
+  aba["!cols"] = [{wch:9},{wch:62},{wch:22},{wch:20},{wch:11},{wch:13},{wch:9},{wch:52},{wch:13},{wch:13},{wch:46},{wch:46},{wch:13},{wch:18}];
+  aba["!freeze"] = {xSplit:0, ySplit:1};
+  const livro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(livro, aba, "Plano Tático");
+  XLSX.writeFile(livro, "plano-tatico-acoi-" + HOJE + ".xlsx");
+}
+function exportarCsv(){
+  const dados = linhasParaExportar();
+  const cols = Object.keys(dados[0] || {id:""});
+  const cerca = v => { const s = String(v==null?"":v); return /[";\n\r]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const texto = "﻿" + [cols.join(";")].concat(dados.map(d => cols.map(c => cerca(d[c])).join(";"))).join("\r\n");
+  const url = URL.createObjectURL(new Blob([texto], {type:"text/csv;charset=utf-8"}));
+  const a = document.createElement("a");
+  a.href = url; a.download = "plano-tatico-acoi-" + HOJE + ".csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ================= navegação ================= */
+function trocarVista(v){
+  est.vista = v;
+  document.querySelectorAll(".abas button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.vista === v)));
+  $("vistaPainel").hidden = v !== "painel";
+  $("vistaPlanilha").hidden = v !== "planilha";
+  $("vistaImportar").hidden = v !== "importar";
+  renderizar();
+  window.scrollTo({top:0});
+}
+function renderizar(){
+  if(est.vista === "painel") renderPainel();
+  else if(est.vista === "planilha"){ if(!est.editando) renderPlanilha(); }
+  else renderImportar();
+}
+document.querySelectorAll(".abas button").forEach(b => b.addEventListener("click", () => trocarVista(b.dataset.vista)));
+
+sb.auth.onAuthStateChange((evento, sessao) => {
+  if(sessao && $("telaApp").hidden) aoEntrar(sessao);
+});
+sb.auth.getSession().then(({data}) => {
+  if(data.session) aoEntrar(data.session);
+  else if(window.location.hash.includes("error")){
+    const p = new URLSearchParams(window.location.hash.slice(1));
+    const d = p.get("error_description") || "";
+    recado(d.toLowerCase().includes("expired")
+      ? "<strong>O link expirou.</strong> Peça um novo abaixo."
+      : "<strong>Não consegui concluir a entrada.</strong> " + esc(d) + " Peça um novo link abaixo.", "ruim");
+  }
+});
+})();
+</script>
+</body>
+</html>
