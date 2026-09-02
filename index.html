@@ -370,6 +370,7 @@ const COLUNAS = [
   {campo:"prazo", titulo:"Prazo", classe:"cel-prazo", tipo:"data"},
   {campo:"status", titulo:"Status", classe:"cel-status", tipo:"opcao", opcoes:Object.keys(STATUS)},
   {campo:"resultado", titulo:"Resultado esperado", classe:"cel-nota", tipo:"texto-longo"},
+  {campo:"observacao", titulo:"Observação", classe:"cel-nota", tipo:"texto-longo"},
   {campo:"prioridade", titulo:"Prioridade", classe:"cel-prio", tipo:"opcao", opcoes:PRIORIDADES},
   {campo:"esforco", titulo:"Esforço", classe:"cel-prio", tipo:"opcao", opcoes:ESFORCOS},
   {campo:"notas", titulo:"Notas", classe:"cel-nota", tipo:"texto-longo"}
@@ -808,7 +809,11 @@ function renderPlanilha(){
           : atrasada(t) ? '<span class="selo late">Atrasada</span>'
           : '<span class="selo '+(STATUS[t.status]||STATUS["a-fazer"]).classe+'">'+esc((STATUS[t.status]||STATUS["a-fazer"]).rotulo)+'</span>';
       } else if(c.campo === "frente"){ v = esc(FRENTES[t.frente]||t.frente||"—"); }
-      else if(c.campo === "prazo"){ v = t.prazo ? dataBr(t.prazo) : '<span style="color:var(--ink-3)">sem data</span>'; }
+      else if(c.campo === "prazo"){
+        v = t.prazo ? dataBr(t.prazo)
+          : t.prazo_texto ? '<span style="color:var(--ink-2)" title="Foi assim que o PMO escreveu, sem data de partida">'+esc(t.prazo_texto)+'</span>'
+          : '<span style="color:var(--ink-3)">sem data</span>';
+      }
       else if(c.campo === "responsavel"){
         const x = (t.responsavel||"").trim();
         v = !x ? '<span style="opacity:.5">—</span>'
