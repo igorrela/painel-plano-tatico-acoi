@@ -209,6 +209,8 @@ td textarea.editando{resize:vertical; min-height:62px; line-height:1.45}
   border:1px solid var(--line-2); background:var(--surface); color:var(--ink);
   border-radius:var(--radius); padding:6px 9px; font:inherit; font-size:12.5px;
 }
+.abas-entrada{margin-bottom:18px; width:100%}
+.abas-entrada button{flex:1; justify-content:center}
 .tema-entrada{
   margin-top:18px; padding-top:16px; border-top:1px solid var(--line);
   display:flex; align-items:center; justify-content:space-between; gap:10px;
@@ -236,14 +238,33 @@ td textarea.editando{resize:vertical; min-height:62px; line-height:1.45}
   <div class="cartao-entrada">
     <div class="selo-marca">ACOI · Corp · Home · Projetos</div>
     <h1>Plano Tático</h1>
-    <p id="textoEntrada">Acesso restrito. Informe o e-mail cadastrado e enviamos um link de entrada válido por uma hora.</p>
-    <form id="formEntrada">
-      <label class="campo">
-        <span>E-mail</span>
-        <input type="email" id="campoEmail" required autocomplete="email" placeholder="nome@acoi.com.br" spellcheck="false">
-      </label>
-      <button class="btn primario largo" type="submit" id="btEntrar">Receber link de acesso</button>
+    <p>Acesso restrito à equipe da ACOI.</p>
+    <div class="abas abas-entrada" role="tablist">
+      <button role="tab" aria-selected="true" data-modo="entrar">Já tenho senha</button>
+      <button role="tab" aria-selected="false" data-modo="criar">Primeiro acesso</button>
+    </div>
+
+    <form id="formEntrar">
+      <label class="campo"><span>E-mail</span>
+        <input type="email" id="entrarEmail" required autocomplete="email" placeholder="nome@acoi.com.br" spellcheck="false"></label>
+      <label class="campo"><span>Senha</span>
+        <input type="password" id="entrarSenha" required autocomplete="current-password" placeholder="sua senha"></label>
+      <button class="btn primario largo" type="submit" id="btEntrar">Entrar</button>
     </form>
+
+    <form id="formCriar" hidden>
+      <p style="margin:0 0 16px">Você só faz isso uma vez. Escolha uma senha sua e use o código que o Igor Rela passou.</p>
+      <label class="campo"><span>E-mail</span>
+        <input type="email" id="criarEmail" autocomplete="email" placeholder="nome@acoi.com.br" spellcheck="false"></label>
+      <label class="campo"><span>Código de convite</span>
+        <input type="text" id="criarCodigo" placeholder="ACOI-..." spellcheck="false" autocapitalize="characters"></label>
+      <label class="campo"><span>Crie sua senha</span>
+        <input type="password" id="criarSenha" autocomplete="new-password" placeholder="ao menos 8 caracteres"></label>
+      <label class="campo"><span>Repita a senha</span>
+        <input type="password" id="criarSenha2" autocomplete="new-password" placeholder="a mesma de novo"></label>
+      <button class="btn primario largo" type="submit" id="btCriar">Criar meu acesso</button>
+    </form>
+
     <div id="recadoEntrada" hidden></div>
     <div class="tema-entrada">
       <span>Aparência</span>
@@ -273,10 +294,23 @@ td textarea.editando{resize:vertical; min-height:62px; line-height:1.45}
         <option value="claro">Tema claro</option>
         <option value="escuro">Tema escuro</option>
       </select>
+      <button class="btn" id="btMinhaSenha">Minha senha</button>
       <button class="btn" id="btSair">Sair</button>
     </div>
   </div>
   <main>
+    <div class="painel" id="painelSenha" hidden style="max-width:520px">
+      <h3>Trocar minha senha</h3>
+      <p>Vale só para você. Se esquecer a senha, peça ao Igor Rela para gerar um acesso novo.</p>
+      <form id="formSenha" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">
+        <label class="campo" style="margin:0;flex:1;min-width:170px"><span>Nova senha</span>
+          <input type="password" id="novaSenha" autocomplete="new-password" placeholder="ao menos 8 caracteres"></label>
+        <label class="campo" style="margin:0;flex:1;min-width:170px"><span>Repita</span>
+          <input type="password" id="novaSenha2" autocomplete="new-password" placeholder="a mesma de novo"></label>
+        <button class="btn primario" type="submit" id="btSalvarSenha" style="padding:11px 18px">Salvar</button>
+      </form>
+      <div id="recadoSenha" style="margin-top:12px" hidden></div>
+    </div>
     <div class="aviso" id="avisoTopo" hidden></div>
     <section id="vistaPainel"></section>
     <section id="vistaPlanilha" hidden></section>
@@ -390,36 +424,97 @@ function recado(texto, tipo){
   el.innerHTML = texto;
 }
 
-$("formEntrada").addEventListener("submit", async ev => {
-  ev.preventDefault();
-  const email = $("campoEmail").value.trim().toLowerCase();
-  if(!email) return;
-  const bt = $("btEntrar");
-  bt.disabled = true; bt.textContent = "Enviando…";
-  recado("", "info");
+document.querySelectorAll(".abas-entrada button").forEach(b => b.addEventListener("click", () => {
+  const modo = b.dataset.modo;
+  document.querySelectorAll(".abas-entrada button").forEach(x => x.setAttribute("aria-selected", String(x.dataset.modo === modo)));
+  $("formEntrar").hidden = modo !== "entrar";
+  $("formCriar").hidden = modo !== "criar";
+  recado("");
+}));
 
-  const {error} = await sb.auth.signInWithOtp({
-    email: email,
-    options: {emailRedirectTo: window.location.href.split("#")[0].split("?")[0]}
-  });
-
-  bt.disabled = false; bt.textContent = "Receber link de acesso";
-  if(error){
-    const m = String(error.message || "").toLowerCase();
-    if(m.includes("autorizado") || m.includes("not authorized") || m.includes("database error") || m.includes("unexpected_failure")){
-      recado("<strong>E-mail não autorizado.</strong> Este endereço não está na lista de acesso do plano. Peça ao Igor Rela para incluir você.", "ruim");
-    } else if(m.includes("rate") || m.includes("seconds") || m.includes("limit")){
-      recado("<strong>O envio de e-mails atingiu o limite da hora.</strong> Não é problema do seu cadastro nem do seu e-mail: "
-        + "o serviço de envio está no plano gratuito e libera poucos links por hora, para todo mundo junto. "
-        + "Tente de novo mais tarde ou avise o Igor Rela.", "ruim");
-    } else {
-      recado("Não consegui enviar o link agora. Tente de novo em instantes.", "ruim");
-    }
-    return;
+function explicarErroEntrada(error){
+  const m = String((error && error.message) || "").toLowerCase();
+  if(m.includes("invalid login") || m.includes("invalid credentials")){
+    return ["<strong>E-mail ou senha não conferem.</strong> Se este é seu primeiro acesso, use a aba <em>Primeiro acesso</em> para criar sua senha.", "ruim"];
   }
-  recado("<strong>Link enviado para "+esc(email)+".</strong> Abra o e-mail e clique para entrar. Se não aparecer em alguns minutos, confira o spam.", "bom");
+  if(m.includes("codigo") || m.includes("convite")){
+    return ["<strong>Código de convite inválido.</strong> Confira o código que o Igor Rela passou, incluindo os hifens.", "ruim"];
+  }
+  if(m.includes("autorizado") || m.includes("not authorized")){
+    return ["<strong>E-mail não autorizado.</strong> Este endereço não está na lista de acesso. Peça ao Igor Rela para incluir você.", "ruim"];
+  }
+  if(m.includes("database error") || m.includes("unexpected_failure")){
+    return ["<strong>Não consegui criar o acesso.</strong> Ou o e-mail não está na lista, ou o código de convite está errado. Confira os dois com o Igor Rela.", "ruim"];
+  }
+  if(m.includes("already registered") || m.includes("already been registered")){
+    return ["<strong>Esse e-mail já tem senha criada.</strong> Use a aba <em>Já tenho senha</em> para entrar.", "ruim"];
+  }
+  if(m.includes("password") && m.includes("least")){
+    return ["A senha precisa ter ao menos 8 caracteres.", "ruim"];
+  }
+  if(m.includes("rate") || m.includes("limit")){
+    return ["Muitas tentativas seguidas. Espere um minuto e tente de novo.", "ruim"];
+  }
+  return ["Não consegui completar agora. Tente de novo em instantes.", "ruim"];
+}
+
+$("formEntrar").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const email = $("entrarEmail").value.trim().toLowerCase();
+  const senha = $("entrarSenha").value;
+  if(!email || !senha) return;
+  const bt = $("btEntrar");
+  bt.disabled = true; bt.textContent = "Entrando…"; recado("");
+  const {error} = await sb.auth.signInWithPassword({email:email, password:senha});
+  bt.disabled = false; bt.textContent = "Entrar";
+  if(error){ const [txt, tipo] = explicarErroEntrada(error); recado(txt, tipo); }
 });
 
+$("formCriar").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const email = $("criarEmail").value.trim().toLowerCase();
+  const codigo = $("criarCodigo").value.trim();
+  const senha = $("criarSenha").value, senha2 = $("criarSenha2").value;
+  if(!email || !codigo || !senha){ recado("Preencha os quatro campos.", "ruim"); return; }
+  if(senha.length < 8){ recado("A senha precisa ter ao menos 8 caracteres.", "ruim"); return; }
+  if(senha !== senha2){ recado("As duas senhas não são iguais. Digite de novo.", "ruim"); return; }
+
+  const bt = $("btCriar");
+  bt.disabled = true; bt.textContent = "Criando…"; recado("");
+  const {data, error} = await sb.auth.signUp({
+    email: email, password: senha, options: {data: {convite: codigo}}
+  });
+  bt.disabled = false; bt.textContent = "Criar meu acesso";
+
+  if(error){ const [txt, tipo] = explicarErroEntrada(error); recado(txt, tipo); return; }
+  if(data && data.session) return;  // entrou direto, onAuthStateChange assume
+  recado("<strong>Acesso criado.</strong> Agora use a aba <em>Já tenho senha</em> para entrar.", "bom");
+});
+
+$("btMinhaSenha").addEventListener("click", () => {
+  const p = $("painelSenha");
+  p.hidden = !p.hidden;
+  if(!p.hidden) $("novaSenha").focus();
+});
+$("formSenha").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const a = $("novaSenha").value, b = $("novaSenha2").value, rec = $("recadoSenha");
+  rec.hidden = false;
+  if(a.length < 8){ rec.className = "recado ruim"; rec.textContent = "A senha precisa ter ao menos 8 caracteres."; return; }
+  if(a !== b){ rec.className = "recado ruim"; rec.textContent = "As duas senhas não são iguais."; return; }
+  const bt = $("btSalvarSenha");
+  bt.disabled = true; bt.textContent = "Salvando…";
+  const {error} = await sb.auth.updateUser({password: a});
+  bt.disabled = false; bt.textContent = "Salvar";
+  if(error){
+    rec.className = "recado ruim";
+    rec.textContent = "Não consegui trocar a senha agora. Tente de novo em instantes.";
+  } else {
+    rec.className = "recado bom";
+    rec.textContent = "Senha trocada. Use a nova da próxima vez que entrar.";
+    $("novaSenha").value = ""; $("novaSenha2").value = "";
+  }
+});
 $("btSair").addEventListener("click", async () => {
   await sb.auth.signOut();
   window.location.href = window.location.href.split("#")[0].split("?")[0];
@@ -1369,11 +1464,7 @@ sb.auth.onAuthStateChange((evento, sessao) => {
 sb.auth.getSession().then(({data}) => {
   if(data.session) aoEntrar(data.session);
   else if(window.location.hash.includes("error")){
-    const p = new URLSearchParams(window.location.hash.slice(1));
-    const d = p.get("error_description") || "";
-    recado(d.toLowerCase().includes("expired")
-      ? "<strong>O link expirou.</strong> Peça um novo abaixo."
-      : "<strong>Não consegui concluir a entrada.</strong> " + esc(d) + " Peça um novo link abaixo.", "ruim");
+    recado("Não consegui concluir a entrada por esse link. Use e-mail e senha abaixo.", "ruim");
   }
 });
 })();
