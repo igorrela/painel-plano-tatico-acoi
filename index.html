@@ -204,7 +204,31 @@ td textarea.editando{resize:vertical; min-height:62px; line-height:1.45}
 .para{color:var(--ok); font-weight:500}
 .progresso{height:5px; background:var(--track); border-radius:3px; overflow:hidden; margin-top:12px}
 .progresso i{display:block; height:100%; background:var(--accent); transition:width .2s}
+
+.tema{
+  border:1px solid var(--line-2); background:var(--surface); color:var(--ink);
+  border-radius:var(--radius); padding:6px 9px; font:inherit; font-size:12.5px;
+}
+.tema-entrada{
+  margin-top:18px; padding-top:16px; border-top:1px solid var(--line);
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  font-size:12.5px; color:var(--ink-3);
+}
+/* Barra estreita: some primeiro o que é enfeite, depois o que é secundário. */
+@media (max-width:1180px){ .marca .sub{display:none} }
+@media (max-width:980px){ .eu{display:none} .sinc{display:none} }
+@media (max-width:760px){ .abas button{padding:6px 9px; font-size:12px} .topo{gap:10px; padding:0 12px} }
 </style>
+<script>
+// Aplica o tema salvo antes da primeira pintura, senão a tela pisca na cor errada.
+(function(){
+  try {
+    var t = localStorage.getItem("acoi_tema");
+    if(t === "claro") document.documentElement.setAttribute("data-theme", "light");
+    else if(t === "escuro") document.documentElement.setAttribute("data-theme", "dark");
+  } catch(e){ /* navegador sem armazenamento local: segue o sistema */ }
+})();
+</script>
 </head>
 <body>
 
@@ -221,6 +245,14 @@ td textarea.editando{resize:vertical; min-height:62px; line-height:1.45}
       <button class="btn primario largo" type="submit" id="btEntrar">Receber link de acesso</button>
     </form>
     <div id="recadoEntrada" hidden></div>
+    <div class="tema-entrada">
+      <span>Aparência</span>
+      <select class="tema" id="temaEntrada" aria-label="Tema da tela">
+        <option value="auto">Acompanha o sistema</option>
+        <option value="claro">Claro</option>
+        <option value="escuro">Escuro</option>
+      </select>
+    </div>
   </div>
 </div>
 
@@ -236,6 +268,11 @@ td textarea.editando{resize:vertical; min-height:62px; line-height:1.45}
     <div class="topo-dir">
       <div class="sinc"><span class="ponto" id="ponto"></span><span id="sincTexto">conectando…</span></div>
       <span class="eu" id="euSou"></span>
+      <select class="tema" id="tema" aria-label="Tema da tela">
+        <option value="auto">Tema automático</option>
+        <option value="claro">Tema claro</option>
+        <option value="escuro">Tema escuro</option>
+      </select>
       <button class="btn" id="btSair">Sair</button>
     </div>
   </div>
@@ -1140,6 +1177,22 @@ function renderizar(){
   else renderImportar();
 }
 document.querySelectorAll(".abas button").forEach(b => b.addEventListener("click", () => trocarVista(b.dataset.vista)));
+
+/* ================= tema ================= */
+const SELETORES_TEMA = [$("tema"), $("temaEntrada")];
+function lerTema(){
+  try { return localStorage.getItem("acoi_tema") || "auto"; } catch(e){ return "auto"; }
+}
+function aplicarTema(valor){
+  const raiz = document.documentElement;
+  if(valor === "claro") raiz.setAttribute("data-theme", "light");
+  else if(valor === "escuro") raiz.setAttribute("data-theme", "dark");
+  else raiz.removeAttribute("data-theme");
+  try { localStorage.setItem("acoi_tema", valor); } catch(e){ /* sem armazenamento local */ }
+  SELETORES_TEMA.forEach(s => { if(s) s.value = valor; });
+}
+aplicarTema(lerTema());
+SELETORES_TEMA.forEach(s => { if(s) s.addEventListener("change", e => aplicarTema(e.target.value)); });
 
 sb.auth.onAuthStateChange((evento, sessao) => {
   if(sessao && $("telaApp").hidden) aoEntrar(sessao);
