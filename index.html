@@ -20,6 +20,8 @@
   --wip:#B57C08; --wip-soft:#F8EEDA;
   --late:#A32D50; --late-soft:#F8E4EA;
   --track:#DDE4EC;
+  --pmo-secao:#052043; --pmo-secao-ink:#FFFFFF;
+  --pmo-objetivo:#C9DAF8; --pmo-objetivo-ink:#0E1B2E;
   --shadow:0 1px 2px rgba(19,24,32,.06), 0 4px 14px rgba(19,24,32,.05);
   --radius:7px;
 }
@@ -33,6 +35,8 @@
     --wip:#B4861F; --wip-soft:#2B2415;
     --late:#BB3A6E; --late-soft:#2E1622;
     --track:#28313C;
+    --pmo-secao:#0A2647; --pmo-secao-ink:#DCE7F5;
+    --pmo-objetivo:#1C3050; --pmo-objetivo-ink:#CFE0F7;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
   }
 }
@@ -45,6 +49,8 @@
   --wip:#B4861F; --wip-soft:#2B2415;
   --late:#BB3A6E; --late-soft:#2E1622;
   --track:#28313C;
+  --pmo-secao:#0A2647; --pmo-secao-ink:#DCE7F5;
+  --pmo-objetivo:#1C3050; --pmo-objetivo-ink:#CFE0F7;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
 }
 *{box-sizing:border-box}
@@ -180,6 +186,16 @@ td.cel-nota{min-width:180px; max-width:300px; color:var(--ink-2); font-size:12.5
 td[data-editar]{cursor:text}
 td .editando{width:100%; border:1.5px solid var(--accent); border-radius:4px; padding:5px 7px; font:inherit; font-size:13px; background:var(--surface); color:var(--ink); min-height:30px}
 td textarea.editando{resize:vertical; min-height:62px; line-height:1.45}
+tr.linha-secao td{
+  background:var(--pmo-secao); color:var(--pmo-secao-ink); font-weight:600;
+  font-size:11.5px; letter-spacing:.07em; text-transform:uppercase;
+  padding:9px 10px; position:sticky; left:0;
+}
+tr.linha-secao:hover td{background:var(--pmo-secao)}
+tr.linha-objetivo td{background:var(--pmo-objetivo); color:var(--pmo-objetivo-ink); font-weight:600}
+tr.linha-objetivo:hover td{background:var(--pmo-objetivo); filter:brightness(.97)}
+tr.linha-objetivo td.cel-id{color:var(--pmo-objetivo-ink); opacity:.65}
+tr.linha-reservada td{opacity:.62; font-style:italic}
 .acao-linha{border:0; background:transparent; color:var(--ink-3); padding:3px 6px; border-radius:4px; font-size:15px; line-height:1}
 .acao-linha:hover{background:var(--late-soft); color:var(--late)}
 
@@ -375,6 +391,8 @@ const SECOES_PMO = [
   ["mkt",  "PLANO TATICO MARKETING (CSC)"]
 ];
 const STATUS_PMO = {"concluida":"Realizado", "em-andamento":"Em andamento", "a-fazer":"Aguardando", "cancelada":"Cancelado"};
+const ORDEM_FRENTE = {}; SECOES_PMO.forEach(([k], i) => ORDEM_FRENTE[k] = i);
+const TITULO_FRENTE = {}; SECOES_PMO.forEach(([k, t]) => TITULO_FRENTE[k] = t.trim());
 const NAVY = "FF052043", AZUL_CLARO = "FFC9DAF8";
 
 const est = {
@@ -733,6 +751,16 @@ function filtrar(){
   });
   const {campo, dir} = est.ordem;
   ts.sort((a,b) => {
+    // A ordem natural é a da planilha do PMO: seções na sequência deles,
+    // e dentro de cada seção a posição original da linha.
+    if(campo === "id"){
+      const ia = ORDEM_FRENTE[a.frente], ib = ORDEM_FRENTE[b.frente];
+      const fa = ia === undefined ? 99 : ia, fb = ib === undefined ? 99 : ib;
+      if(fa !== fb) return dir === "asc" ? fa - fb : fb - fa;
+      const oa = Number(a.ordem) || 9999, ob = Number(b.ordem) || 9999;
+      if(oa !== ob) return dir === "asc" ? oa - ob : ob - oa;
+      return String(a.id).localeCompare(String(b.id), "pt-BR", {numeric:true});
+    }
     const va = String(a[campo]==null?"":a[campo]), vb = String(b[campo]==null?"":b[campo]);
     if(!va && vb) return 1;
     if(va && !vb) return -1;
@@ -740,6 +768,14 @@ function filtrar(){
     return dir==="asc" ? c : -c;
   });
   return ts;
+}
+
+// As faixas de seção só fazem sentido quando a grade está na ordem da planilha
+// e sem filtro; fora disso, elas separariam coisas que não estão juntas.
+function mostrandoEstrutura(){
+  const f = est.filtros;
+  return est.ordem.campo === "id" && est.ordem.dir === "asc"
+    && !f.busca && !f.frente && !f.status && !f.responsavel && !f.soAtrasadas;
 }
 
 function renderPlanilha(){
@@ -751,17 +787,32 @@ function renderPlanilha(){
     + (est.ordem.campo===c.campo ? '<span class="seta">'+(est.ordem.dir==="asc"?"↑":"↓")+'</span>' : "") + '</th>').join("")
     + (est.podeEditar ? '<th style="width:38px" aria-label="Excluir"></th>' : "");
 
+  const comEstrutura = mostrandoEstrutura();
+  let frenteAberta = null;
+
   const corpo = ts.length ? ts.map(t => {
+    const objetivo = t.tipo_linha === "objetivo";
+    // Faixa de seção quando a frente muda, igual à planilha oficial.
+    let faixa = "";
+    if(comEstrutura && t.frente !== frenteAberta){
+      frenteAberta = t.frente;
+      faixa = '<tr class="linha-secao"><td colspan="' + (COLUNAS.length + (est.podeEditar ? 1 : 0)) + '">'
+            + esc(TITULO_FRENTE[t.frente] || FRENTES[t.frente] || t.frente) + '</td></tr>';
+    }
+
     const celulas = COLUNAS.map(c => {
       let v;
       if(c.campo === "status"){
-        v = atrasada(t) ? '<span class="selo late">Atrasada</span>'
+        // Linha de título de grupo não carrega status na planilha do PMO.
+        v = objetivo ? '<span style="opacity:.55">título de grupo</span>'
+          : atrasada(t) ? '<span class="selo late">Atrasada</span>'
           : '<span class="selo '+(STATUS[t.status]||STATUS["a-fazer"]).classe+'">'+esc((STATUS[t.status]||STATUS["a-fazer"]).rotulo)+'</span>';
       } else if(c.campo === "frente"){ v = esc(FRENTES[t.frente]||t.frente||"—"); }
       else if(c.campo === "prazo"){ v = t.prazo ? dataBr(t.prazo) : '<span style="color:var(--ink-3)">sem data</span>'; }
       else if(c.campo === "responsavel"){
         const x = (t.responsavel||"").trim();
-        v = (!x || x==="a-definir") ? '<span style="color:var(--late)">a definir</span>' : esc(x);
+        v = !x ? '<span style="opacity:.5">—</span>'
+          : x === "a-definir" ? '<span style="color:var(--late)">a definir</span>' : esc(x);
       } else if(c.campo==="prioridade" || c.campo==="esforco"){
         const x = t[c.campo] || "a-classificar";
         v = x==="a-classificar" ? '<span style="color:var(--ink-3)">—</span>' : esc(x.replace("-"," "));
@@ -772,8 +823,12 @@ function renderPlanilha(){
       const ed = (c.tipo!=="fixo" && est.podeEditar) ? ' data-editar="'+esc(c.campo)+'"' : "";
       return '<td class="'+c.classe+'"'+ed+' data-id="'+esc(t.id)+'">'+v+'</td>';
     }).join("");
-    return '<tr'+(atrasada(t)?' class="risco"':"")+' data-linha="'+esc(t.id)+'">'+celulas
-      + (est.podeEditar ? '<td style="text-align:center"><button class="acao-linha" data-apagar="'+esc(t.id)+'" aria-label="Excluir tarefa '+esc(t.id)+'">×</button></td>' : "")
+    const classes = [];
+    if(objetivo) classes.push("linha-objetivo");
+    if(t.vazia) classes.push("linha-reservada");
+    if(!objetivo && atrasada(t)) classes.push("risco");
+    return faixa + '<tr'+(classes.length ? ' class="'+classes.join(" ")+'"' : "")+' data-linha="'+esc(t.id)+'">'+celulas
+      + (est.podeEditar ? '<td style="text-align:center"><button class="acao-linha" data-apagar="'+esc(t.id)+'" aria-label="Excluir linha '+esc(t.id)+'">×</button></td>' : "")
       + '</tr>';
   }).join("") : '<tr><td colspan="'+(COLUNAS.length+1)+'"><div class="vazio">Nenhuma tarefa bate com esses filtros.</div></td></tr>';
 
@@ -787,6 +842,12 @@ function renderPlanilha(){
     + '<button class="chip" id="fAtraso" aria-pressed="'+(est.filtros.soAtrasadas?"true":"false")+'">Só atrasadas</button>'
     + (est.podeEditar ? '<button class="btn primario" id="btNova">+ Nova tarefa</button>' : "")
     + '<span class="contagem">'+ts.length+' de '+est.tarefas.size+'</span></div>'
+    + '<div class="legenda" style="margin:-4px 0 11px">'
+      + '<span><i class="chave" style="background:var(--pmo-secao)"></i>Faixa de seção</span>'
+      + '<span><i class="chave" style="background:var(--pmo-objetivo)"></i>Título de grupo</span>'
+      + '<span><i class="chave" style="background:var(--surface-3)"></i>Linha reservada, ainda sem ação escrita</span>'
+      + (comEstrutura ? '' : '<span style="color:var(--ink-3)">As faixas de seção reaparecem ao limpar os filtros e voltar à ordem da planilha (clique em ID).</span>')
+    + '</div>'
     + '<div class="grade-caixa"><table class="grade"><thead><tr>'+cab+'</tr></thead><tbody>'+corpo+'</tbody></table></div>';
 
   const raiz = $("vistaPlanilha");
