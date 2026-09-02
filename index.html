@@ -287,6 +287,7 @@ td textarea.editando{resize:vertical; min-height:62px; line-height:1.45}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script>
 (function(){
 "use strict";
@@ -323,7 +324,24 @@ const COLUNAS = [
   {campo:"esforco", titulo:"Esforço", classe:"cel-prio", tipo:"opcao", opcoes:ESFORCOS},
   {campo:"notas", titulo:"Notas", classe:"cel-nota", tipo:"texto-longo"}
 ];
-const CAMPOS_TABELA = ["id","tarefa","frente","responsavel","prazo","status","resultado","esforco","prioridade","notas","origem"];
+const CAMPOS_TABELA = ["id","tarefa","frente","responsavel","prazo","status","resultado","esforco",
+  "prioridade","notas","origem","tipo_linha","prazo_texto","observacao","ordem",
+  "status_pmo","novo_prazo_texto"];
+
+// Ordem e títulos exatos das seções na planilha do PMO. A exportação
+// precisa sair assim para eles conferirem lado a lado com o arquivo deles.
+const SECOES_PMO = [
+  ["rh",   "PLANO TÁTICO - RECURSOS HUMANOS"],
+  ["sup",  "PLANO TÁTICO - SUPRIMENTOS"],
+  ["eng",  "PLANO TÁTICO - ENGENHARIA"],
+  ["orc",  "PLANO TÁTICO ORÇAMENTOS"],
+  ["fin",  "PLANO TÁTICO FINANÇAS CORPORATIVAS"],
+  ["home", "PLANO TATICO HOME (INCORPORADORA)"],
+  ["proj", "PLANO TATICO ACOI PROJETOS "],
+  ["mkt",  "PLANO TATICO MARKETING (CSC)"]
+];
+const STATUS_PMO = {"concluida":"Realizado", "em-andamento":"Em andamento", "a-fazer":"Aguardando", "cancelada":"Cancelado"};
+const NAVY = "FF052043", AZUL_CLARO = "FFC9DAF8";
 
 const est = {
   tarefas:new Map(), vista:"painel", podeEditar:false, admin:false, pessoas:[], email:"", nome:"",
@@ -342,6 +360,20 @@ function normalizar(s){
     .toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
 }
 function listaTarefas(){ return Array.from(est.tarefas.values()); }
+
+// Há linhas do PMO com a ação vazia (o texto está no resultado) e linhas
+// totalmente em branco, deixadas por eles como espaço reservado.
+function textoDe(t){
+  if(t.tarefa && String(t.tarefa).trim()) return t.tarefa;
+  if(t.resultado && String(t.resultado).trim()) return t.resultado;
+  return "— linha reservada no plano do PMO, ainda sem ação escrita —";
+}
+// Chave de casamento na importação. Linha em branco não tem texto para casar,
+// então usa a posição dela dentro da frente.
+function chaveDe(t){
+  const txt = normalizar(t.tarefa || t.resultado || "");
+  return txt || ("linha-vazia:" + (t.frente || "") + ":" + (Number(t.ordem) || 0));
+}
 function avisar(msg, tipo){
   const el = $("avisoTopo");
   if(!msg){ el.hidden = true; return; }
@@ -459,6 +491,12 @@ function paraBanco(t){
   const o = {};
   CAMPOS_TABELA.forEach(c => o[c] = t[c] == null ? "" : String(t[c]));
   o.prazo = t.prazo ? String(t.prazo).slice(0,10) : null;
+  o.prazo_original = t.prazo_original ? String(t.prazo_original).slice(0,10) : null;
+  o.novo_prazo = t.novo_prazo ? String(t.novo_prazo).slice(0,10) : null;
+  o.ordem = Number(t.ordem) || 0;
+  o.tipo_linha = t.tipo_linha === "objetivo" ? "objetivo" : "acao";
+  o.texto_em_b = t.texto_em_b === true;
+  o.vazia = t.vazia === true;
   o.atualizado_em = new Date().toISOString();
   o.atualizado_por = est.nome || est.email;
   return o;
@@ -542,7 +580,7 @@ function renderPainel(){
   }).join("");
 
   const item = (t, dir) => '<div class="linha" data-ir="'+esc(t.id)+'" tabindex="0" role="button">'
-    + '<div class="corpo"><div class="t">'+esc(t.tarefa)+'</div><div class="m"><span class="mono">'+esc(t.id)+'</span>'
+    + '<div class="corpo"><div class="t">'+esc(textoDe(t))+'</div><div class="m"><span class="mono">'+esc(t.id)+'</span>'
     + '<span>'+esc(FRENTES[t.frente]||t.frente)+'</span><span>'+esc(t.responsavel||"sem dono")+'</span></div></div>'
     + '<div class="dir">'+dir+'</div></div>';
 
@@ -593,7 +631,7 @@ function filtrar(){
     }
     if(f.responsavel && t.responsavel !== f.responsavel) return false;
     if(f.soAtrasadas && !atrasada(t)) return false;
-    if(busca && !normalizar([t.id,t.tarefa,t.responsavel,t.resultado,t.notas].join(" ")).includes(busca)) return false;
+    if(busca && !normalizar([t.id,t.tarefa,t.responsavel,t.resultado,t.observacao,t.notas].join(" ")).includes(busca)) return false;
     return true;
   });
   const {campo, dir} = est.ordem;
@@ -630,6 +668,9 @@ function renderPlanilha(){
       } else if(c.campo==="prioridade" || c.campo==="esforco"){
         const x = t[c.campo] || "a-classificar";
         v = x==="a-classificar" ? '<span style="color:var(--ink-3)">—</span>' : esc(x.replace("-"," "));
+      } else if(c.campo === "tarefa"){
+        const vazio = !(t.tarefa && String(t.tarefa).trim());
+        v = vazio ? '<span style="color:var(--ink-3)">'+esc(textoDe(t))+'</span>' : esc(t.tarefa);
       } else { v = esc(t[c.campo]||"") || '<span style="color:var(--ink-3)">—</span>'; }
       const ed = (c.tipo!=="fixo" && est.podeEditar) ? ' data-editar="'+esc(c.campo)+'"' : "";
       return '<td class="'+c.classe+'"'+ed+' data-id="'+esc(t.id)+'">'+v+'</td>';
@@ -675,7 +716,7 @@ function renderPlanilha(){
   raiz.querySelectorAll("[data-apagar]").forEach(b => b.addEventListener("click", ev => {
     ev.stopPropagation();
     const t = est.tarefas.get(b.dataset.apagar);
-    if(t && confirm('Excluir a tarefa "'+String(t.tarefa).slice(0,80)+'"?\n\nA linha some do painel para todo mundo.')) apagar(t.id);
+    if(t && confirm('Excluir a tarefa "'+String(textoDe(t)).slice(0,80)+'"?\n\nA linha some do painel para todo mundo.')) apagar(t.id);
   }));
 }
 
@@ -711,7 +752,20 @@ function abrirEdicao(td){
     const novo = salvar ? el.value : valor;
     if(salvar && novo !== valor){
       const atual = est.tarefas.get(id);
-      if(atual){ const copia = Object.assign({}, atual); copia[campo] = novo; gravar(copia); return; }
+      if(atual){
+        const copia = Object.assign({}, atual);
+        copia[campo] = novo;
+        // Mudanças feitas aqui precisam chegar à planilha do PMO nas colunas certas.
+        if(campo === "status") copia.status_pmo = STATUS_PMO[novo] || "";
+        if(campo === "prazo"){
+          // Se a tarefa já tinha prazo repactuado, é ele que muda; senão, o original.
+          if(atual.novo_prazo) copia.novo_prazo = novo;
+          else copia.prazo_original = novo;
+          if(novo){ copia.prazo_texto = ""; copia.novo_prazo_texto = ""; }
+        }
+        gravar(copia);
+        return;
+      }
     }
     renderPlanilha();
   };
@@ -729,11 +783,18 @@ function novoId(frente){
   while(est.tarefas.has(pre+"-"+String(n).padStart(2,"0"))) n++;
   return pre+"-"+String(n).padStart(2,"0");
 }
+// Vai para o fim da sua seção na exportação, sem embaralhar a sequência do PMO.
+function proximaOrdem(frente){
+  let maior = 0;
+  est.tarefas.forEach(t => { if(t.frente === frente) maior = Math.max(maior, Number(t.ordem) || 0); });
+  return maior + 1;
+}
 async function novaTarefa(){
   const frente = est.filtros.frente || "rh";
   const t = {id:novoId(frente), tarefa:"Nova tarefa — descreva a ação", frente:frente, responsavel:"a-definir",
     prazo:"", status:"a-fazer", resultado:"", esforco:"a-classificar", prioridade:"a-classificar",
-    notas:"", origem:"criada no painel em "+dataBr(HOJE)};
+    notas:"", observacao:"", prazo_texto:"", novo_prazo:"", tipo_linha:"acao", ordem:proximaOrdem(frente),
+    origem:"criada no painel em "+dataBr(HOJE)};
   await gravar(t);
   est.ordem = {campo:"id", dir:"asc"};
   renderPlanilha();
@@ -783,7 +844,7 @@ function lerPlanilhaG4(linhas){
         iNovo = cab.findIndex(c => c.includes("novo prazo"));
   const CHAVES = {"recursos humanos":"rh","suprimentos":"sup","engenharia":"eng","orcamento":"orc",
     "financas":"fin","home":"home","projetos":"proj","marketing":"mkt","comercial":"mkt"};
-  const saida = []; let frente = null;
+  const saida = []; let frente = null; const conta = {};
   for(let i = iCab+1; i < linhas.length; i++){
     const L = linhas[i];
     const acao = String(L[iAcao]==null?"":L[iAcao]).trim();
@@ -799,17 +860,26 @@ function lerPlanilhaG4(linhas){
     const st = iStatus>=0 ? String(L[iStatus]==null?"":L[iStatus]).trim() : "";
     const p = paraIso(iPrazo>=0 ? L[iPrazo] : ""), np = paraIso(iNovo>=0 ? L[iNovo] : "");
     if(!resp && !st && !resultado && !p.iso && !p.texto && !np.iso) continue;
-    const notas = [];
-    let prazo = p.iso;
-    if(np.iso){ if(p.iso) notas.push("prazo original na planilha era "+p.iso+", repactuado para "+np.iso); prazo = np.iso; }
-    else if(p.iso && p.texto) notas.push(p.texto);
-    else if(p.texto) notas.push("prazo na planilha: “"+p.texto+"”, sem data-base declarada");
-    const stn = normalizar(st);
-    if(stn === "atrasado" || stn === "atrasada") notas.push("marcada como Atrasado na planilha de origem");
     const obs = iObs>=0 ? String(L[iObs]==null?"":L[iObs]).trim() : "";
-    if(obs) notas.push("obs. da planilha: "+obs);
-    saida.push({tarefa:acao||resultado, frente:frente, responsavel:resp||"a-definir", prazo:prazo,
-      status:MAPA_STATUS[stn]||"a-fazer", resultado:acao?resultado:"", notas:notas.join("; ")});
+    const stn = normalizar(st);
+    // O prazo que vale é o repactuado, quando existe. As duas datas e o texto
+    // original ficam guardados em campos próprios para a exportação devolvê-los.
+    conta[frente] = (conta[frente] || 0) + 1;
+    saida.push({
+      ordem: conta[frente],
+      // Ação e resultado ficam nas colunas de origem, sem fundir uma na outra:
+      // a exportação precisa devolvê-las onde o PMO as escreveu.
+      tarefa: acao, resultado: resultado,
+      texto_em_b: !acao && !!resultado,
+      vazia: !acao && !resultado,
+      frente: frente, responsavel: resp || (acao || resultado ? "a-definir" : ""),
+      prazo_original: p.iso || "", prazo_texto: (!p.iso && p.texto) ? p.texto : "",
+      novo_prazo: np.iso || "", novo_prazo_texto: (!np.iso && np.texto) ? np.texto : "",
+      prazo: np.iso || p.iso || "",
+      status: MAPA_STATUS[stn] || "a-fazer",
+      status_pmo: st,
+      observacao: obs
+    });
   }
   return saida.length ? saida : null;
 }
@@ -837,23 +907,26 @@ function lerPlanilhaPainel(linhas){
 function compararComPlano(novas){
   const porChave = new Map();
   listaTarefas().sort((a,b)=>String(a.id).localeCompare(String(b.id),"pt-BR",{numeric:true})).forEach(t => {
-    const k = normalizar(t.tarefa);
+    const k = chaveDe(t);
     if(!porChave.has(k)) porChave.set(k, []);
     porChave.get(k).push(t);
   });
   const vistos = new Set();
   const res = {novas:[], mudadas:[], iguais:0, sumidas:[]};
-  const CAMPOS = [{c:"responsavel",r:"Responsável"},{c:"prazo",r:"Prazo"},{c:"status",r:"Status"},
-                  {c:"resultado",r:"Resultado esperado"},{c:"notas",r:"Notas"}];
+  const CAMPOS = [{c:"responsavel",r:"Responsável"},{c:"prazo",r:"Prazo"},{c:"novo_prazo",r:"Novo prazo"},
+                  {c:"prazo_texto",r:"Prazo em texto"},{c:"status",r:"Status"},
+                  {c:"resultado",r:"Resultado esperado"},{c:"observacao",r:"Observação"}];
+  const DATAS = {prazo:1, novo_prazo:1};
   novas.forEach(n => {
-    const fila = porChave.get(normalizar(n.tarefa));
+    const fila = porChave.get(chaveDe(n));
     let atual = (fila && fila.length) ? fila.shift() : null;
     if(!atual && n.id){ const pid = est.tarefas.get(n.id); if(pid && !vistos.has(pid.id)) atual = pid; }
     if(!atual){ res.novas.push(n); return; }
     vistos.add(atual.id);
     const difs = [];
     CAMPOS.forEach(({c,r}) => {
-      const de = c==="prazo" ? (atual.prazo ? String(atual.prazo).slice(0,10) : "") : String(atual[c]==null?"":atual[c]).trim();
+      const bruto = atual[c];
+      const de = DATAS[c] ? (bruto ? String(bruto).slice(0,10) : "") : String(bruto==null?"":bruto).trim();
       const para = String(n[c]==null?"":n[c]).trim();
       if(para && de !== para) difs.push({campo:c, rotulo:r, de:de, para:para});
     });
@@ -887,13 +960,13 @@ function renderImportar(){
     const corta = v => v ? esc(String(v).length > 90 ? String(v).slice(0,90)+"…" : v) : "<em style='color:var(--ink-3)'>vazio</em>";
     const lMud = imp.mudadas.slice(0,120).map(m =>
       '<div class="mud-linha"><div class="cab"><span class="mono" style="color:var(--ink-3);font-size:11.5px">'+esc(m.atual.id)+'</span>'
-      + '<strong style="font-size:12.5px">'+esc(String(m.atual.tarefa).slice(0,110))+'</strong></div>'
+      + '<strong style="font-size:12.5px">'+esc(String(textoDe(m.atual)).slice(0,110))+'</strong></div>'
       + m.difs.map(d => '<div class="campo-mud"><b>'+esc(d.rotulo)+':</b> <span class="de">'
           + (d.campo==="prazo" ? esc(dataBr(d.de)) : corta(d.de)) + '</span> → <span class="para">'
           + (d.campo==="prazo" ? esc(dataBr(d.para)) : corta(d.para)) + '</span></div>').join("") + '</div>').join("");
     const lNovas = imp.novas.slice(0,60).map(n =>
       '<div class="mud-linha"><div class="cab"><span class="selo neutro">nova</span>'
-      + '<strong style="font-size:12.5px">'+esc(String(n.tarefa).slice(0,110))+'</strong></div>'
+      + '<strong style="font-size:12.5px">'+esc(String(textoDe(n)).slice(0,110))+'</strong></div>'
       + '<div class="campo-mud">'+esc(FRENTES[n.frente]||n.frente||"sem frente")+' · '+esc(n.responsavel||"sem dono")
       + ' · '+esc(n.prazo?dataBr(n.prazo):"sem prazo")+'</div></div>').join("");
 
@@ -927,10 +1000,15 @@ function renderImportar(){
     + '<div id="erroArquivo" style="margin-top:12px" hidden></div></div>'
     + bloco
     + '<div class="painel"><h3>Exportar</h3>'
-    + '<p>A planilha sai em Excel de verdade, com as colunas já dimensionadas e a primeira linha congelada. O CSV serve para quem prefere abrir em outro programa.</p>'
+    + '<p>A planilha para o PMO sai no formato exato do arquivo deles: as mesmas sete colunas na mesma ordem, '
+    + 'as oito seções na mesma sequência, com os cabeçalhos em azul-marinho e as linhas de objetivo em azul claro. '
+    + 'Prazo escrito como texto na origem (&ldquo;60 DIAS&rdquo;, &ldquo;IMEDIATO&rdquo;) volta como texto, e o status é devolvido no vocabulário deles: '
+    + 'Realizado, Em andamento, Aguardando.</p>'
     + '<div style="display:flex;gap:9px;flex-wrap:wrap">'
-      + '<button class="btn primario" id="btXlsx">Baixar Excel (.xlsx)</button>'
-      + '<button class="btn" id="btCsv">Baixar CSV</button></div></div>';
+      + '<button class="btn primario" id="btPmo">Baixar planilha para o PMO (.xlsx)</button>'
+      + '<button class="btn" id="btCsv">Backup completo (.csv)</button></div>'
+    + '<p style="margin:14px 0 0;font-size:12.5px">O backup em CSV leva tudo o que o painel guarda, inclusive o identificador, '
+    + 'a frente, a prioridade e o esforço, que não existem na planilha do PMO. Serve para arquivo e para reimportar aqui sem perder nada.</p></div>';
 
   const raiz = $("vistaImportar");
   const entrada = raiz.querySelector("#arquivo"), solta = raiz.querySelector("#solta");
@@ -941,7 +1019,7 @@ function renderImportar(){
   solta.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if(f) processarArquivo(f); });
   const ap = raiz.querySelector("#btAplicar"); if(ap) ap.addEventListener("click", aplicarImportacao);
   const de = raiz.querySelector("#btDescartar"); if(de) de.addEventListener("click", () => { est.importacao = null; renderImportar(); });
-  raiz.querySelector("#btXlsx").addEventListener("click", exportarXlsx);
+  raiz.querySelector("#btPmo").addEventListener("click", exportarPmo);
   raiz.querySelector("#btCsv").addEventListener("click", exportarCsv);
 }
 
@@ -1005,10 +1083,13 @@ async function aplicarImportacao(){
     trabalho.push(paraBanco(copia));
   });
   imp.novas.forEach(n => {
+    const frente = n.frente || "nova";
     trabalho.push(paraBanco(Object.assign({}, n, {
-      id: (n.id && !est.tarefas.has(n.id)) ? n.id : novoId(n.frente || "nova"),
+      id: (n.id && !est.tarefas.has(n.id)) ? n.id : novoId(frente),
       esforco: n.esforco || "a-classificar",
       prioridade: n.prioridade || "a-classificar",
+      tipo_linha: n.tipo_linha || "acao",
+      ordem: proximaOrdem(frente),
       origem: "importada de " + imp.arquivo + " em " + dataBr(HOJE)
     })));
   });
@@ -1041,36 +1122,122 @@ function linhasParaExportar(){
   return listaTarefas()
     .sort((a,b) => String(a.id).localeCompare(String(b.id), "pt-BR", {numeric:true}))
     .map(t => ({
-      id:t.id, tarefa:t.tarefa, frente:FRENTES[t.frente]||t.frente, responsavel:t.responsavel,
+      id:t.id, tarefa:t.tarefa, frente:FRENTES[t.frente]||t.frente, tipo_linha:t.tipo_linha||"acao",
+      responsavel:t.responsavel,
       prazo:t.prazo ? String(t.prazo).slice(0,10) : "",
+      prazo_texto:t.prazo_texto || "",
+      novo_prazo:t.novo_prazo ? String(t.novo_prazo).slice(0,10) : "",
       status:(STATUS[t.status]||{}).rotulo || t.status,
       atrasada: atrasada(t) ? "sim" : "nao",
-      resultado:t.resultado, esforco:t.esforco, prioridade:t.prioridade,
-      notas:t.notas, origem:t.origem,
+      resultado:t.resultado, observacao:t.observacao || "",
+      esforco:t.esforco, prioridade:t.prioridade,
+      notas:t.notas, origem:t.origem, ordem:t.ordem || 0,
       atualizado_em:t.atualizado_em ? String(t.atualizado_em).slice(0,10) : "",
       atualizado_por:t.atualizado_por || ""
     }));
 }
-function exportarXlsx(){
-  if(typeof XLSX === "undefined"){ avisar("A biblioteca de Excel não carregou. Use o CSV ou recarregue a página."); return; }
-  const dados = linhasParaExportar();
-  const aba = XLSX.utils.json_to_sheet(dados, {header:["id","tarefa","frente","responsavel","prazo","status","atrasada","resultado","esforco","prioridade","notas","origem","atualizado_em","atualizado_por"]});
-  aba["!cols"] = [{wch:9},{wch:62},{wch:22},{wch:20},{wch:11},{wch:13},{wch:9},{wch:52},{wch:13},{wch:13},{wch:46},{wch:46},{wch:13},{wch:18}];
-  aba["!freeze"] = {xSplit:0, ySplit:1};
-  const livro = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(livro, aba, "Plano Tático");
-  XLSX.writeFile(livro, "plano-tatico-acoi-" + HOJE + ".xlsx");
+function entregarArquivo(blob, nome){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = nome;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+// Reproduz a planilha do PMO: mesmas sete colunas, mesma ordem de seções,
+// mesmas cores, mesma fonte e as linhas de seção mescladas de A até G.
+async function exportarPmo(){
+  if(typeof ExcelJS === "undefined"){
+    avisar("A biblioteca que escreve o Excel não carregou. Recarregue a página e tente de novo, ou use o backup em CSV.");
+    return;
+  }
+  const bt = $("btPmo");
+  bt.disabled = true; bt.textContent = "Montando a planilha…";
+  try {
+    const livro = new ExcelJS.Workbook();
+    livro.creator = "Painel do Plano Tático ACOI";
+    livro.created = new Date();
+
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2,"0"), mm = String(d.getMonth()+1).padStart(2,"0"),
+          aa = String(d.getFullYear()).slice(2);
+    const aba = livro.addWorksheet("Plano Tático-Acoi Time " + dd + " " + mm + " " + aa,
+      {views:[{state:"frozen", ySplit:1}]});
+
+    aba.columns = [{width:45.1},{width:12.63},{width:19.2},{width:18.4},{width:12.8},{width:16},{width:14}];
+
+    const fonte = {name:"Calibri", size:9};
+    const ALINHA = ["left","left","center","center","center","left","center"];
+    const pintar = (linha, cor, negrito) => {
+      for(let c = 1; c <= 7; c++){
+        const cel = linha.getCell(c);
+        cel.font = Object.assign({}, fonte, {bold:!!negrito, color:{argb: cor === NAVY ? "FFFFFFFF" : "FF000000"}});
+        if(cor) cel.fill = {type:"pattern", pattern:"solid", fgColor:{argb:cor}};
+        cel.alignment = {wrapText:true, vertical:"middle", horizontal:ALINHA[c-1]};
+      }
+    };
+
+    const cab = aba.addRow(["AÇÃO","RESULTADO ESPERADO","RESPONSÁVEL","PRAZO","STATUS","Observação","Novo Prazo"]);
+    pintar(cab, NAVY, true);
+    cab.eachCell(c => { c.alignment = {wrapText:true, vertical:"middle", horizontal:"center"}; });
+
+    const porFrente = {};
+    listaTarefas().forEach(t => { (porFrente[t.frente] = porFrente[t.frente] || []).push(t); });
+
+    let escritas = 0;
+    SECOES_PMO.forEach(([chave, titulo]) => {
+      const linhaSecao = aba.addRow([titulo, "", "", "", "", "", ""]);
+      pintar(linhaSecao, NAVY, true);
+      aba.mergeCells("A" + linhaSecao.number + ":G" + linhaSecao.number);
+
+      const itens = (porFrente[chave] || []).slice().sort((a,b) => {
+        const oa = Number(a.ordem) || 9999, ob = Number(b.ordem) || 9999;
+        return oa !== ob ? oa - ob : String(a.id).localeCompare(String(b.id), "pt-BR", {numeric:true});
+      });
+
+      itens.forEach(t => {
+        const objetivo = t.tipo_linha === "objetivo";
+        // Coluna D é o prazo ORIGINAL do PMO (ou o texto que eles escreveram
+        // no lugar da data); a data repactuada tem coluna própria, a G.
+        const prazoCel = t.prazo_texto ? t.prazo_texto
+          : (t.prazo_original ? new Date(String(t.prazo_original).slice(0,10) + "T00:00:00") : "");
+        const novoCel = t.novo_prazo_texto ? t.novo_prazo_texto
+          : (t.novo_prazo ? new Date(String(t.novo_prazo).slice(0,10) + "T00:00:00") : "");
+        // O STATUS devolvido é o que o PMO mantém à mão (inclusive o "Atrasado" deles,
+        // que sobrevive à repactuação do prazo). Só é recalculado quando alguém muda
+        // o status por aqui, e nesse caso status_pmo já foi atualizado junto.
+        const linha = aba.addRow([
+          t.tarefa || "",
+          t.resultado || "",
+          t.responsavel === "a-definir" ? "" : (t.responsavel || ""),
+          prazoCel,
+          objetivo ? "" : (t.status_pmo || STATUS_PMO[t.status] || ""),
+          t.observacao || "",
+          novoCel
+        ]);
+        pintar(linha, objetivo ? AZUL_CLARO : null, objetivo);
+        if(prazoCel instanceof Date) linha.getCell(4).numFmt = "dd/mm/yyyy";
+        if(novoCel instanceof Date) linha.getCell(7).numFmt = "dd/mm/yyyy";
+        escritas++;
+      });
+    });
+
+    const buffer = await livro.xlsx.writeBuffer();
+    entregarArquivo(new Blob([buffer], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),
+      "Plano de Ação Consolidado - ACOI " + dd + "-" + mm + "-" + d.getFullYear() + ".xlsx");
+    avisar("<strong>Planilha gerada</strong> no formato do PMO, com " + escritas + " linhas nas 8 seções.", "ok");
+  } catch(e){
+    avisar("Não consegui montar a planilha. Recarregue a página e tente de novo.");
+  } finally {
+    bt.disabled = false; bt.textContent = "Baixar planilha para o PMO (.xlsx)";
+  }
 }
 function exportarCsv(){
   const dados = linhasParaExportar();
   const cols = Object.keys(dados[0] || {id:""});
   const cerca = v => { const s = String(v==null?"":v); return /[";\n\r]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
   const texto = "﻿" + [cols.join(";")].concat(dados.map(d => cols.map(c => cerca(d[c])).join(";"))).join("\r\n");
-  const url = URL.createObjectURL(new Blob([texto], {type:"text/csv;charset=utf-8"}));
-  const a = document.createElement("a");
-  a.href = url; a.download = "plano-tatico-acoi-" + HOJE + ".csv";
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  entregarArquivo(new Blob([texto], {type:"text/csv;charset=utf-8"}), "plano-tatico-acoi-" + HOJE + ".csv");
 }
 
 /* ================= pessoas ================= */
