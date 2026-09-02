@@ -231,6 +231,7 @@ td textarea.editando{resize:vertical; min-height:62px; line-height:1.45}
       <button role="tab" aria-selected="true" data-vista="painel">Painel</button>
       <button role="tab" aria-selected="false" data-vista="planilha">Planilha</button>
       <button role="tab" aria-selected="false" data-vista="importar">Importar e exportar</button>
+      <button role="tab" aria-selected="false" data-vista="pessoas" id="abaPessoas" hidden>Pessoas</button>
     </div>
     <div class="topo-dir">
       <div class="sinc"><span class="ponto" id="ponto"></span><span id="sincTexto">conectando…</span></div>
@@ -243,6 +244,7 @@ td textarea.editando{resize:vertical; min-height:62px; line-height:1.45}
     <section id="vistaPainel"></section>
     <section id="vistaPlanilha" hidden></section>
     <section id="vistaImportar" hidden></section>
+    <section id="vistaPessoas" hidden></section>
   </main>
 </div>
 
@@ -287,7 +289,7 @@ const COLUNAS = [
 const CAMPOS_TABELA = ["id","tarefa","frente","responsavel","prazo","status","resultado","esforco","prioridade","notas","origem"];
 
 const est = {
-  tarefas:new Map(), vista:"painel", podeEditar:false, email:"", nome:"",
+  tarefas:new Map(), vista:"painel", podeEditar:false, admin:false, pessoas:[], email:"", nome:"",
   filtros:{busca:"", frente:"", status:"", responsavel:"", soAtrasadas:false},
   ordem:{campo:"id", dir:"asc"}, editando:null, importacao:null
 };
@@ -356,7 +358,10 @@ $("btSair").addEventListener("click", async () => {
 async function aoEntrar(sessao){
   est.email = (sessao.user.email || "").toLowerCase();
 
-  const {data:perfil, error} = await sb.from("perfis").select("nome,papel").limit(1).maybeSingle();
+  const {data:perfil, error} = await sb.from("perfis")
+    .select("nome,papel,administra")
+    .eq("email", est.email)
+    .maybeSingle();
   if(error || !perfil){
     $("telaEntrada").hidden = false;
     $("telaApp").hidden = true;
@@ -368,9 +373,11 @@ async function aoEntrar(sessao){
 
   est.nome = perfil.nome || est.email;
   est.podeEditar = perfil.papel === "editor";
+  est.admin = perfil.administra === true;
   $("telaEntrada").hidden = true;
   $("telaApp").hidden = false;
   $("euSou").textContent = est.nome + (est.podeEditar ? "" : " · leitura");
+  $("abaPessoas").hidden = !est.admin;
 
   if(!est.podeEditar){
     avisar("<strong>Somente leitura.</strong> Você acompanha o plano, filtra e exporta, mas as alterações estão reservadas a quem tem permissão de edição.");
@@ -1029,6 +1036,91 @@ function exportarCsv(){
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/* ================= pessoas ================= */
+async function carregarPessoas(){
+  const {data, error} = await sb.from("perfis").select("*").order("nome");
+  est.pessoas = error ? [] : (data || []);
+  return !error;
+}
+
+function renderPessoas(){
+  const eu = est.email;
+  const linhas = est.pessoas.map(p => {
+    const souEu = (p.email || "").toLowerCase() === eu;
+    return '<tr>'
+      + '<td>'+esc(p.nome || "—")+(souEu ? ' <span class="selo neutro">você</span>' : "")+'</td>'
+      + '<td class="mono" style="font-size:12px">'+esc(p.email)+'</td>'
+      + '<td><select data-papel="'+esc(p.email)+'"'+(souEu?" disabled":"")+' style="border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:5px;padding:4px 7px;font:inherit;font-size:12.5px">'
+        + '<option value="leitor"'+(p.papel==="leitor"?" selected":"")+'>Só leitura</option>'
+        + '<option value="editor"'+(p.papel==="editor"?" selected":"")+'>Edita o plano</option></select></td>'
+      + '<td style="text-align:center">'+(p.administra ? '<span class="selo ok">administra</span>' : '<span style="color:var(--ink-3)">—</span>')+'</td>'
+      + '<td style="text-align:center">'+(souEu ? '<span style="color:var(--ink-3)" title="Você não pode remover a si mesmo">—</span>'
+          : '<button class="acao-linha" data-remover="'+esc(p.email)+'" aria-label="Remover acesso de '+esc(p.email)+'">×</button>')+'</td>'
+      + '</tr>';
+  }).join("");
+
+  $("vistaPessoas").innerHTML =
+      '<div class="painel"><h3>Quem tem acesso ao plano</h3>'
+    + '<p>Só quem está nesta lista consegue entrar. Quem não está não vira usuário nem tentando se cadastrar, '
+    + 'porque o próprio banco recusa o e-mail. Mudança de papel vale na hora, sem a pessoa precisar sair e entrar de novo.</p>'
+    + '<div class="grade-caixa" style="max-height:none"><table class="grade"><thead><tr>'
+      + '<th style="cursor:default">Nome</th><th style="cursor:default">E-mail</th>'
+      + '<th style="cursor:default">Pode</th><th style="cursor:default;text-align:center">Lista de acesso</th>'
+      + '<th style="cursor:default;width:38px"></th></tr></thead><tbody>'
+    + (linhas || '<tr><td colspan="5"><div class="vazio">Ninguém cadastrado ainda.</div></td></tr>')
+    + '</tbody></table></div></div>'
+
+    + '<div class="painel"><h3>Liberar acesso para alguém</h3>'
+    + '<p>O e-mail precisa ser o mesmo que a pessoa vai digitar na tela de entrada. Depois de salvar, avise ela para abrir o painel e pedir o link.</p>'
+    + '<form id="formPessoa" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'
+      + '<label class="campo" style="margin:0;flex:1;min-width:180px"><span>Nome</span><input id="pNome" placeholder="Francislene" required></label>'
+      + '<label class="campo" style="margin:0;flex:1.4;min-width:230px"><span>E-mail</span><input id="pEmail" type="email" placeholder="nome@acoi.com.br" required spellcheck="false"></label>'
+      + '<label class="campo" style="margin:0;min-width:170px"><span>Pode</span>'
+        + '<select id="pPapel" style="width:100%;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:var(--radius);padding:10px 12px;font:inherit;font-size:14px">'
+        + '<option value="leitor">Só leitura</option><option value="editor">Edita o plano</option></select></label>'
+      + '<button class="btn primario" type="submit" style="padding:11px 18px">Liberar acesso</button>'
+    + '</form><div id="recadoPessoa" style="margin-top:12px" hidden></div></div>'
+
+    + '<div class="painel"><h3>Uma coisa que o × não faz</h3>'
+    + '<p style="margin:0">Remover alguém da lista corta o acesso ao plano na hora: a pessoa deixa de ver qualquer tarefa. '
+    + 'Mas a conta de login dela continua existindo no sistema, apenas sem enxergar nada. '
+    + 'Se um dia você quiser apagar a conta de vez, isso é feito no painel do Supabase, em Authentication.</p></div>';
+
+    const raiz = $("vistaPessoas");
+    raiz.querySelectorAll("[data-papel]").forEach(s => s.addEventListener("change", async e => {
+      const {error} = await sb.from("perfis").update({papel:e.target.value}).eq("email", s.dataset.papel);
+      if(error) avisar("Não consegui mudar o papel de " + esc(s.dataset.papel) + ".");
+      await carregarPessoas(); renderPessoas();
+    }));
+    raiz.querySelectorAll("[data-remover]").forEach(b => b.addEventListener("click", async () => {
+      const alvo = b.dataset.remover;
+      if(!confirm("Tirar o acesso de " + alvo + " ao plano tático?")) return;
+      const {error} = await sb.from("perfis").delete().eq("email", alvo);
+      if(error) avisar("Não consegui remover " + esc(alvo) + ".");
+      await carregarPessoas(); renderPessoas();
+    }));
+    raiz.querySelector("#formPessoa").addEventListener("submit", async ev => {
+      ev.preventDefault();
+      const rec = $("recadoPessoa");
+      const email = $("pEmail").value.trim().toLowerCase();
+      const {error} = await sb.from("perfis").insert({
+        email: email, nome: $("pNome").value.trim(), papel: $("pPapel").value
+      });
+      rec.hidden = false;
+      if(error){
+        const dup = String(error.message||"").toLowerCase().includes("duplicate");
+        rec.className = "recado ruim";
+        rec.innerHTML = dup ? "<strong>" + esc(email) + " já está na lista.</strong> Ajuste o papel na tabela acima."
+          : "Não consegui liberar o acesso. " + esc(mensagemErro(error));
+      } else {
+        rec.className = "recado bom";
+        rec.innerHTML = "<strong>Acesso liberado para " + esc(email) + ".</strong> Avise a pessoa para abrir o painel e pedir o link de entrada.";
+        $("pNome").value = ""; $("pEmail").value = "";
+        await carregarPessoas(); renderPessoas();
+      }
+    });
+}
+
 /* ================= navegação ================= */
 function trocarVista(v){
   est.vista = v;
@@ -1036,12 +1128,15 @@ function trocarVista(v){
   $("vistaPainel").hidden = v !== "painel";
   $("vistaPlanilha").hidden = v !== "planilha";
   $("vistaImportar").hidden = v !== "importar";
+  $("vistaPessoas").hidden = v !== "pessoas";
+  if(v === "pessoas"){ carregarPessoas().then(renderPessoas); return; }
   renderizar();
   window.scrollTo({top:0});
 }
 function renderizar(){
   if(est.vista === "painel") renderPainel();
   else if(est.vista === "planilha"){ if(!est.editando) renderPlanilha(); }
+  else if(est.vista === "pessoas") renderPessoas();
   else renderImportar();
 }
 document.querySelectorAll(".abas button").forEach(b => b.addEventListener("click", () => trocarVista(b.dataset.vista)));
