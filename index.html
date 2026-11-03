@@ -1244,20 +1244,34 @@ async function aplicarImportacao(){
   const bt = $("btAplicar"), barra = $("progresso");
   bt.disabled = true; bt.textContent = "Aplicando…"; barra.hidden = false;
 
-  const trabalho = [];
+  // O banco recusa o lote inteiro se o mesmo id aparecer duas vezes nele.
+  // Por isso cada tarefa alterada entra uma vez só, e cada nova ganha id e
+  // ordem que ainda não foram usados nem no banco nem neste mesmo lote.
+  const alteradas = new Map();
   imp.mudadas.forEach(m => {
-    const copia = Object.assign({}, est.tarefas.get(m.atual.id) || m.atual);
+    const id = m.atual.id;
+    const copia = alteradas.get(id) || Object.assign({}, est.tarefas.get(id) || m.atual);
     m.difs.forEach(d => { copia[d.campo] = d.para; });
-    trabalho.push(paraBanco(copia));
+    alteradas.set(id, copia);
   });
+  const trabalho = Array.from(alteradas.values()).map(paraBanco);
+  const ocupados = new Set(est.tarefas.keys());
+  const ultimaOrdem = {};
   imp.novas.forEach(n => {
     const frente = n.frente || "nova";
+    let id = (n.id && !ocupados.has(n.id)) ? n.id : "";
+    for(let k = 1; !id; k++){
+      const tentativa = frente + "-" + String(k).padStart(2,"0");
+      if(!ocupados.has(tentativa)) id = tentativa;
+    }
+    ocupados.add(id);
+    ultimaOrdem[frente] = (frente in ultimaOrdem ? ultimaOrdem[frente] : proximaOrdem(frente) - 1) + 1;
     trabalho.push(paraBanco(Object.assign({}, n, {
-      id: (n.id && !est.tarefas.has(n.id)) ? n.id : novoId(frente),
+      id: id,
       esforco: n.esforco || "a-classificar",
       prioridade: n.prioridade || "a-classificar",
       tipo_linha: n.tipo_linha || "acao",
-      ordem: proximaOrdem(frente),
+      ordem: ultimaOrdem[frente],
       origem: "importada de " + imp.arquivo + " em " + dataBr(HOJE)
     })));
   });
