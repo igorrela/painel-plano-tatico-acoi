@@ -394,12 +394,12 @@ const SECOES_PMO = [
 const STATUS_PMO = {"concluida":"Realizado", "em-andamento":"Em andamento", "a-fazer":"Aguardando", "cancelada":"Cancelado"};
 const ORDEM_FRENTE = {}; SECOES_PMO.forEach(([k], i) => ORDEM_FRENTE[k] = i);
 const TITULO_FRENTE = {}; SECOES_PMO.forEach(([k, t]) => TITULO_FRENTE[k] = t.trim());
-const NAVY = "FF052043", AZUL_CLARO = "FFC9DAF8";
+const AZUL_CLARO = "FFC9DAF8";
 
 const est = {
   tarefas:new Map(), vista:"painel", podeEditar:false, admin:false, pessoas:[], email:"", nome:"",
   filtros:{busca:"", frente:"", status:"", responsavel:"", soAtrasadas:false},
-  ordem:{campo:"id", dir:"asc"}, editando:null, importacao:null
+  ordem:{campo:"id", dir:"asc"}, editando:null, importacao:null, molde:undefined
 };
 
 const HOJE = new Date().toISOString().slice(0,10);
@@ -998,6 +998,9 @@ function paraIso(v){
   }
   return {iso:"", texto:s};
 }
+// Como o título de cada faixa de seção do PMO aponta para uma frente do painel.
+const CHAVES_FRENTE = {"recursos humanos":"rh","suprimentos":"sup","engenharia":"eng","orcamento":"orc",
+  "financas":"fin","home":"home","projetos":"proj","marketing":"mkt","comercial":"mkt"};
 function lerPlanilhaG4(linhas){
   let iCab = -1;
   for(let i = 0; i < Math.min(linhas.length, 30); i++){
@@ -1010,8 +1013,6 @@ function lerPlanilhaG4(linhas){
         iResp = cab.findIndex(c => c.includes("responsavel")), iPrazo = cab.findIndex(c => c === "prazo"),
         iStatus = cab.findIndex(c => c.includes("status")), iObs = cab.findIndex(c => c.includes("observa")),
         iNovo = cab.findIndex(c => c.includes("novo prazo"));
-  const CHAVES = {"recursos humanos":"rh","suprimentos":"sup","engenharia":"eng","orcamento":"orc",
-    "financas":"fin","home":"home","projetos":"proj","marketing":"mkt","comercial":"mkt"};
   const saida = []; let frente = null; const conta = {};
   for(let i = iCab+1; i < linhas.length; i++){
     const L = linhas[i];
@@ -1019,7 +1020,7 @@ function lerPlanilhaG4(linhas){
     const up = normalizar(acao);
     if(up.startsWith("plano tatico") || up.startsWith("plano de acao")){
       frente = null;
-      for(const k in CHAVES){ if(up.includes(k)){ frente = CHAVES[k]; break; } }
+      for(const k in CHAVES_FRENTE){ if(up.includes(k)){ frente = CHAVES_FRENTE[k]; break; } }
       continue;
     }
     const resultado = iRes>=0 ? String(L[iRes]==null?"":L[iRes]).trim() : "";
@@ -1081,10 +1082,12 @@ function compararComPlano(novas){
   });
   const vistos = new Set();
   const res = {novas:[], mudadas:[], iguais:0, sumidas:[]};
-  const CAMPOS = [{c:"responsavel",r:"Responsável"},{c:"prazo",r:"Prazo"},{c:"novo_prazo",r:"Novo prazo"},
-                  {c:"prazo_texto",r:"Prazo em texto"},{c:"status",r:"Status"},
-                  {c:"resultado",r:"Resultado esperado"},{c:"observacao",r:"Observação"}];
-  const DATAS = {prazo:1, novo_prazo:1};
+  const CAMPOS = [{c:"responsavel",r:"Responsável"},{c:"prazo",r:"Prazo"},{c:"prazo_original",r:"Prazo original"},
+                  {c:"novo_prazo",r:"Novo prazo"},{c:"prazo_texto",r:"Prazo em texto"},{c:"novo_prazo_texto",r:"Novo prazo em texto"},
+                  {c:"status",r:"Status"},{c:"resultado",r:"Resultado esperado"},{c:"observacao",r:"Observação"}];
+  const DATAS = {prazo:1, prazo_original:1, novo_prazo:1};
+  // Texto de prazo só é apagado quando o arquivo traz a data de verdade no lugar dele.
+  const TEXTO_DA_DATA = {prazo_texto:"prazo_original", novo_prazo_texto:"novo_prazo"};
   novas.forEach(n => {
     const fila = porChave.get(chaveDe(n));
     let atual = (fila && fila.length) ? fila.shift() : null;
@@ -1096,7 +1099,8 @@ function compararComPlano(novas){
       const bruto = atual[c];
       const de = DATAS[c] ? (bruto ? String(bruto).slice(0,10) : "") : String(bruto==null?"":bruto).trim();
       const para = String(n[c]==null?"":n[c]).trim();
-      if(para && de !== para) difs.push({campo:c, rotulo:r, de:de, para:para});
+      const limpa = !para && de && TEXTO_DA_DATA[c] && n[TEXTO_DA_DATA[c]];
+      if((para || limpa) && de !== para) difs.push({campo:c, rotulo:r, de:de, para:para});
     });
     if(difs.length) res.mudadas.push({atual:atual, novo:n, difs:difs});
     else res.iguais++;
@@ -1168,13 +1172,16 @@ function renderImportar(){
     + '<div id="erroArquivo" style="margin-top:12px" hidden></div></div>'
     + bloco
     + '<div class="painel"><h3>Exportar</h3>'
-    + '<p>A planilha para o PMO sai no formato exato do arquivo deles: as mesmas sete colunas na mesma ordem, '
-    + 'as oito seções na mesma sequência, com os cabeçalhos em azul-marinho e as linhas de objetivo em azul claro. '
-    + 'Prazo escrito como texto na origem (&ldquo;60 DIAS&rdquo;, &ldquo;IMEDIATO&rdquo;) volta como texto, e o status é devolvido no vocabulário deles: '
-    + 'Realizado, Em andamento, Aguardando.</p>'
+    + '<p>A planilha para o PMO sai em cima do próprio arquivo deles. Todas as abas do arquivo ficam como estão, e entra uma aba nova com a data de hoje. '
+    + 'Cada linha leva as cores, bordas, altura, lista de status, cor automática e comentários que tinha na rodada anterior; '
+    + 'linha que não existia lá copia o jeito da linha de cima. Prazo escrito como texto (&ldquo;60 DIAS&rdquo;) volta como texto, '
+    + 'e o status volta no vocabulário deles: Realizado, Em andamento, Aguardando, Atrasado.</p>'
+    + '<p id="infoMolde" style="font-size:12.5px">' + textoMolde() + '</p>'
     + '<div style="display:flex;gap:9px;flex-wrap:wrap">'
       + '<button class="btn primario" id="btPmo">Baixar planilha para o PMO (.xlsx)</button>'
-      + '<button class="btn" id="btCsv">Backup completo (.csv)</button></div>'
+      + '<button class="btn" id="btTrocarMolde">Trocar o arquivo de base</button>'
+      + '<button class="btn" id="btCsv">Backup completo (.csv)</button>'
+      + '<input type="file" id="arquivoMolde" accept=".xlsx" hidden></div>'
     + '<p style="margin:14px 0 0;font-size:12.5px">O backup em CSV leva tudo o que o painel guarda, inclusive o identificador, '
     + 'a frente, a prioridade e o esforço, que não existem na planilha do PMO. Serve para arquivo e para reimportar aqui sem perder nada.</p></div>';
 
@@ -1187,10 +1194,24 @@ function renderImportar(){
   solta.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if(f) processarArquivo(f); });
   const ap = raiz.querySelector("#btAplicar"); if(ap) ap.addEventListener("click", aplicarImportacao);
   const de = raiz.querySelector("#btDescartar"); if(de) de.addEventListener("click", () => { est.importacao = null; renderImportar(); });
-  raiz.querySelector("#btPmo").addEventListener("click", exportarPmo);
+  const entradaMolde = raiz.querySelector("#arquivoMolde");
+  // Sem arquivo de base guardado neste navegador, o botão já pede o arquivo.
+  raiz.querySelector("#btPmo").addEventListener("click", () => { if(est.molde) exportarPmo(); else entradaMolde.click(); });
+  raiz.querySelector("#btTrocarMolde").addEventListener("click", () => entradaMolde.click());
+  entradaMolde.addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if(f) exportarPmo(f); });
+  if(est.molde === undefined) lerMolde().then(m => {
+    est.molde = m ? {nome:m.nome, quando:m.quando} : null;
+    const info = $("infoMolde"); if(info) info.innerHTML = textoMolde();
+  });
   raiz.querySelector("#btCsv").addEventListener("click", exportarCsv);
 }
 
+function textoMolde(){
+  if(est.molde === undefined) return "Procurando o arquivo de base…";
+  if(!est.molde) return "Ainda não há arquivo de base neste computador. Ao clicar em Baixar, escolha a última planilha do PMO.";
+  return "Arquivo de base: <strong>" + esc(est.molde.nome) + "</strong>, guardado neste computador em "
+    + esc(dataBr(String(est.molde.quando).slice(0,10))) + ". Ele é trocado sozinho sempre que você sobe uma planilha do PMO acima.";
+}
 function erroArquivo(msg){
   const el = $("erroArquivo");
   if(!el) return;
@@ -1201,7 +1222,7 @@ function processarArquivo(file){
   const nome = file.name.toLowerCase(), leitor = new FileReader();
   leitor.onerror = () => erroArquivo("Não consegui ler o arquivo. Salve de novo e tente outra vez.");
   leitor.onload = ev => {
-    let lidas = null, abaUsada = "", abasTestadas = 0;
+    let lidas = null, abaUsada = "", abasTestadas = 0, formatoPmo = false;
     try {
       if(nome.endsWith(".csv")){
         const l = lerCsv(new TextDecoder("utf-8").decode(ev.target.result));
@@ -1217,8 +1238,11 @@ function processarArquivo(file){
         // de trabalho, não o plano. Testamos todas e ficamos com a que rende mais ações.
         abasTestadas = wb.SheetNames.length;
         wb.SheetNames.forEach(n => {
-          const l = XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, raw:false, dateNF:"yyyy-mm-dd", defval:""});
-          const r = lerPlanilhaG4(l) || lerPlanilhaPainel(l);
+          // raw:true entrega a data da célula; com raw:false vinha o texto já formatado
+          // pelo Excel ("7/31/26", mês primeiro), que não era reconhecido como data.
+          const l = XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, raw:true, defval:""});
+          const g4 = lerPlanilhaG4(l), r = g4 || lerPlanilhaPainel(l);
+          if(g4) formatoPmo = true;
           if(r && (!lidas || r.length > lidas.length)){ lidas = r; abaUsada = n; }
         });
       }
@@ -1229,6 +1253,10 @@ function processarArquivo(file){
         + "ou com id e tarefa (formato exportado por este painel).");
       return;
     }
+    // A planilha do PMO subida aqui vira a base da próxima exportação.
+    if(formatoPmo) guardarMolde(file.name, ev.target.result).then(ok => {
+      const info = $("infoMolde"); if(ok && info) info.innerHTML = textoMolde();
+    });
     const dif = compararComPlano(lidas);
     dif.arquivo = file.name; dif.lidas = lidas.length;
     dif.aba = abaUsada; dif.abasTestadas = abasTestadas;
@@ -1326,9 +1354,253 @@ function entregarArquivo(blob, nome){
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-// Reproduz a planilha do PMO: mesmas sete colunas, mesma ordem de seções,
-// mesmas cores, mesma fonte e as linhas de seção mescladas de A até G.
-async function exportarPmo(){
+/* ---- exportação em cima do arquivo do PMO ---- */
+// A planilha do PMO tem cores, bordas, listas de status, cor automática,
+// comentários e abas de rodadas anteriores que não dá para reproduzir de
+// memória. Por isso a exportação abre o último arquivo do PMO subido aqui,
+// mantém tudo o que ele tem e acrescenta a aba do dia, linha a linha com a
+// formatação da mesma linha na rodada anterior.
+function bancoLocal(){
+  return new Promise((ok, falha) => {
+    const r = indexedDB.open("painel-plano-tatico", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("molde");
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => falha(r.error);
+  });
+}
+async function guardarMolde(nome, dados){
+  try {
+    const db = await bancoLocal();
+    const quando = new Date().toISOString();
+    await new Promise((ok, falha) => {
+      const tx = db.transaction("molde", "readwrite");
+      tx.objectStore("molde").put({nome, dados, quando}, "pmo");
+      tx.oncomplete = ok; tx.onerror = () => falha(tx.error);
+    });
+    est.molde = {nome, quando};
+    return true;
+  } catch(e){ return false; }
+}
+async function lerMolde(){
+  try {
+    const db = await bancoLocal();
+    return await new Promise(ok => {
+      const pedido = db.transaction("molde").objectStore("molde").get("pmo");
+      pedido.onsuccess = () => ok(pedido.result || null);
+      pedido.onerror = () => ok(null);
+    });
+  } catch(e){ return null; }
+}
+
+const COR_STATUS_PMO = {"Atrasado":"FFFF0000", "Realizado":"FF92D050", "Em andamento":"FFFFFF00", "Aguardando":"FFA5A5A5"};
+const clonar = o => o == null ? o : JSON.parse(JSON.stringify(o));
+function clonarValor(v){
+  if(v instanceof Date) return new Date(v.getTime());
+  return (v && typeof v === "object") ? clonar(v) : v;
+}
+function textoCelula(cel){
+  const v = cel.value;
+  if(v == null) return "";
+  if(v instanceof Date) return v.toISOString().slice(0,10);
+  if(typeof v === "object"){
+    if(v.richText) return v.richText.map(p => p.text).join("");
+    if("result" in v) return v.result == null ? "" : String(v.result);
+    if(v.text) return String(v.text);
+  }
+  return String(v);
+}
+function numeroColuna(letras){ let n = 0; for(const ch of letras) n = n*26 + ch.charCodeAt(0) - 64; return n; }
+function letrasColuna(n){ let s = ""; while(n > 0){ const r = (n-1) % 26; s = String.fromCharCode(65+r) + s; n = Math.floor((n-1)/26); } return s; }
+function endereco(a){ const m = /^\$?([A-Z]+)\$?(\d+)$/.exec(a); return {c:numeroColuna(m[1]), r:+m[2]}; }
+// Junta células soltas em faixas contínuas por coluna (E3:E62 E64:E93 …).
+function juntarFaixas(celulas){
+  const porCol = {};
+  celulas.forEach(([c, r]) => { (porCol[c] = porCol[c] || []).push(r); });
+  const faixas = [];
+  Object.keys(porCol).map(Number).sort((a,b) => a-b).forEach(c => {
+    const rs = Array.from(new Set(porCol[c])).sort((a,b) => a-b), L = letrasColuna(c);
+    let ini = rs[0], ant = rs[0];
+    rs.slice(1).concat([null]).forEach(r => {
+      if(r === ant + 1){ ant = r; return; }
+      faixas.push(ini === ant ? L+ini : L+ini+":"+L+ant);
+      ini = ant = r;
+    });
+  });
+  return faixas.join(" ");
+}
+
+// Lê uma aba no formato do PMO: onde está o cabeçalho, a faixa de cada
+// frente e as linhas de cada frente com a chave de casamento (texto da ação).
+function mapearAbaPmo(aba){
+  let cab = 0;
+  for(let r = 1; r <= Math.min(aba.rowCount, 30) && !cab; r++){
+    const t = [];
+    for(let c = 1; c <= 10; c++) t.push(normalizar(textoCelula(aba.getRow(r).getCell(c))));
+    if(t.includes("acao") && t.some(x => x.includes("responsavel"))) cab = r;
+  }
+  if(!cab) return null;
+  const m = {cab, secoes:{}, linhas:{}, ultima:cab, acoes:0, primeiraSecao:0, primeiraAcao:0, primeiroObjetivo:0};
+  let frente = null;
+  for(let r = cab + 1; r <= aba.rowCount; r++){
+    const row = aba.getRow(r);
+    const a = textoCelula(row.getCell(1)).trim(), b = textoCelula(row.getCell(2)).trim();
+    const up = normalizar(a);
+    if(up.startsWith("plano tatico") || up.startsWith("plano de acao")){
+      frente = null;
+      for(const k in CHAVES_FRENTE){ if(up.includes(k)){ frente = CHAVES_FRENTE[k]; break; } }
+      if(frente && !m.secoes[frente]) m.secoes[frente] = r;
+      if(!m.primeiraSecao) m.primeiraSecao = r;
+      m.ultima = r;
+      continue;
+    }
+    if(!frente || ![1,2,3,4,5,6,7].some(c => textoCelula(row.getCell(c)).trim())) continue;
+    const fundo = row.getCell(1).fill && row.getCell(1).fill.fgColor && row.getCell(1).fill.fgColor.argb;
+    const objetivo = fundo === AZUL_CLARO;
+    if(objetivo && !m.primeiroObjetivo) m.primeiroObjetivo = r;
+    if(!objetivo && !m.primeiraAcao) m.primeiraAcao = r;
+    (m.linhas[frente] = m.linhas[frente] || []).push({r, chave:normalizar(a || b), objetivo, usada:false});
+    m.ultima = r; m.acoes++;
+  }
+  return m.acoes ? m : null;
+}
+
+function copiarLinha(de, para, ultimaCol, comValores){
+  if(de.height) para.height = de.height;
+  if(de.hidden) para.hidden = true;
+  for(let c = 1; c <= ultimaCol; c++){
+    const o = de.getCell(c), d = para.getCell(c);
+    d.style = clonar(o.style) || {};
+    if(o.dataValidation) d.dataValidation = clonar(o.dataValidation);
+    if(comValores){
+      d.value = clonarValor(o.value);
+      if(o.note) d.note = clonar(o.note);
+    }
+  }
+}
+
+function valoresPmo(t){
+  const data = iso => { const p = String(iso).slice(0,10).split("-").map(Number); return new Date(Date.UTC(p[0], p[1]-1, p[2])); };
+  // Importações antigas guardaram a data como o texto do Excel, mês primeiro e ano com dois
+  // dígitos ("7/31/26"). Esse texto volta como data; texto escrito pelo PMO volta como está.
+  const prazoDe = (texto, iso) => {
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/.exec(String(texto || "").trim());
+    if(m) return new Date(Date.UTC(2000 + +m[3], +m[1] - 1, +m[2]));
+    return texto ? texto : (iso ? data(iso) : null);
+  };
+  const objetivo = t.tipo_linha === "objetivo";
+  // Coluna D é o prazo ORIGINAL do PMO (ou o texto que eles escreveram
+  // no lugar da data); a data repactuada tem coluna própria, a G.
+  // O STATUS devolvido é o que o PMO mantém à mão (inclusive o "Atrasado" deles);
+  // só muda quando alguém troca o status por aqui.
+  return [
+    t.tarefa || null,
+    t.resultado || null,
+    t.responsavel === "a-definir" ? null : (t.responsavel || null),
+    prazoDe(t.prazo_texto, t.prazo_original || (!t.novo_prazo && t.prazo)),
+    objetivo ? null : (t.status_pmo || STATUS_PMO[t.status] || null),
+    t.observacao || null,
+    prazoDe(t.novo_prazo_texto, t.novo_prazo)
+  ];
+}
+
+// Acrescenta ao livro do PMO a aba do dia. Devolve o que foi feito, ou null
+// se o livro não tem nenhuma aba no formato do PMO para servir de molde.
+function montarAbaPmo(livro, tarefas, nomeAba){
+  let modelo = null, mapa = null;
+  livro.worksheets.forEach(w => {
+    const m = mapearAbaPmo(w);
+    if(m && (!mapa || m.acoes >= mapa.acoes)){ modelo = w; mapa = m; }
+  });
+  if(!modelo) return null;
+  // Exportar duas vezes no mesmo dia substitui a aba do dia, a não ser que ela seja o próprio molde.
+  const repetida = livro.getWorksheet(nomeAba);
+  if(repetida === modelo) nomeAba = nomeAba + " (2)";
+  else if(repetida) livro.removeWorksheet(repetida.id);
+
+  const aba = livro.addWorksheet(nomeAba, {
+    properties:clonar(modelo.properties), pageSetup:clonar(modelo.pageSetup),
+    headerFooter:clonar(modelo.headerFooter), views:clonar(modelo.views)
+  });
+  const ultimaCol = Math.max(modelo.columnCount, 7);
+  for(let c = 1; c <= ultimaCol; c++){
+    const k = modelo.getColumn(c), n = aba.getColumn(c);
+    if(k.width) n.width = k.width;
+    if(k.hidden) n.hidden = true;
+  }
+
+  const origem = [];
+  let n = 0;
+  const poe = (r, comValores) => {
+    n++;
+    copiarLinha(modelo.getRow(r), aba.getRow(n), ultimaCol, comValores);
+    origem[n] = r;
+    return aba.getRow(n);
+  };
+  for(let r = 1; r <= mapa.cab; r++) poe(r, true);
+
+  const porFrente = {};
+  tarefas.forEach(t => { (porFrente[t.frente] = porFrente[t.frente] || []).push(t); });
+  let escritas = 0, novas = 0;
+  SECOES_PMO.forEach(([chave, titulo]) => {
+    const rs = mapa.secoes[chave];
+    const ls = poe(rs || mapa.primeiraSecao, !!rs);
+    if(!rs) ls.getCell(1).value = titulo.trim();
+    aba.mergeCells(ls.number, 1, ls.number, 7);
+
+    const disponiveis = mapa.linhas[chave] || [];
+    const acaoDaFrente = disponiveis.find(x => !x.objetivo);
+    let vizinha = acaoDaFrente ? acaoDaFrente.r : mapa.primeiraAcao;
+    const itens = (porFrente[chave] || []).slice().sort((a,b) => {
+      const oa = Number(a.ordem) || 9999, ob = Number(b.ordem) || 9999;
+      return oa !== ob ? oa - ob : String(a.id).localeCompare(String(b.id), "pt-BR", {numeric:true});
+    });
+    itens.forEach(t => {
+      const objetivo = t.tipo_linha === "objetivo";
+      const chaveT = normalizar(t.tarefa || t.resultado || "");
+      const achada = chaveT ? disponiveis.find(x => !x.usada && x.chave === chaveT) : null;
+      if(achada) achada.usada = true; else novas++;
+      // Linha que já estava no arquivo leva a formatação dela; linha nova copia a de cima.
+      const fonte = achada ? achada.r : (objetivo ? (mapa.primeiroObjetivo || vizinha) : vizinha);
+      const linha = poe(fonte, !!achada);
+      if(achada && !objetivo) vizinha = achada.r;
+      const v = valoresPmo(t);
+      for(let c = 1; c <= 7; c++) linha.getCell(c).value = v[c-1];
+      // O PMO pinta a célula de status à mão; se o status mudou, a cor acompanha.
+      const antes = achada ? textoCelula(modelo.getRow(achada.r).getCell(5)).trim() : "";
+      if(!objetivo && COR_STATUS_PMO[v[4]] && antes !== v[4]){
+        linha.getCell(5).fill = {type:"pattern", pattern:"solid", fgColor:{argb:COR_STATUS_PMO[v[4]]}};
+      }
+      escritas++;
+    });
+  });
+  // As linhas em branco já formatadas abaixo do plano, como no arquivo do PMO.
+  for(let r = mapa.ultima + 1; r <= modelo.rowCount; r++) poe(r, true);
+
+  // Cor automática do status: vale nas mesmas linhas da nova aba que vieram de linhas cobertas no molde.
+  const linhasDe = {};
+  origem.forEach((r, novo) => { if(r) (linhasDe[r] = linhasDe[r] || []).push(novo); });
+  (modelo.conditionalFormattings || []).forEach(cf => {
+    const celulas = [];
+    String(cf.ref).split(/\s+/).filter(Boolean).forEach(trecho => {
+      const [ini, fim] = trecho.split(":");
+      const a = endereco(ini), b = endereco(fim || ini);
+      for(let c = a.c; c <= b.c; c++)
+        for(let r = a.r; r <= b.r; r++) (linhasDe[r] || []).forEach(novo => celulas.push([c, novo]));
+    });
+    if(celulas.length) aba.addConditionalFormatting({ref:juntarFaixas(celulas), rules:clonar(cf.rules)});
+  });
+
+  // A aba nova entra logo depois do molde e abre selecionada sozinha
+  // (duas abas selecionadas no Excel recebem a mesma digitação).
+  const ordem = livro.worksheets.filter(w => w !== aba);
+  ordem.splice(ordem.indexOf(modelo) + 1, 0, aba);
+  ordem.forEach((w, i) => { w.orderNo = i; (w.views || []).forEach(vw => { vw.tabSelected = (w === aba); }); });
+  livro.views = [Object.assign({}, (livro.views && livro.views[0]) || {}, {activeTab:ordem.indexOf(aba), firstSheet:0})];
+
+  return {aba:nomeAba, modelo:modelo.name, escritas, novas, abas:ordem.length};
+}
+
+async function exportarPmo(arquivoEscolhido){
   if(typeof ExcelJS === "undefined"){
     avisar("A biblioteca que escreve o Excel não carregou. Recarregue a página e tente de novo, ou use o backup em CSV.");
     return;
@@ -1336,80 +1608,35 @@ async function exportarPmo(){
   const bt = $("btPmo");
   bt.disabled = true; bt.textContent = "Montando a planilha…";
   try {
+    let molde;
+    if(arquivoEscolhido){
+      molde = {nome:arquivoEscolhido.name, dados:await arquivoEscolhido.arrayBuffer()};
+      await guardarMolde(molde.nome, molde.dados);
+    } else molde = await lerMolde();
+    if(!molde){
+      avisar("Escolha a última planilha do PMO para servir de base da exportação.");
+      return;
+    }
     const livro = new ExcelJS.Workbook();
-    livro.creator = "Painel do Plano Tático ACOI";
-    livro.created = new Date();
+    await livro.xlsx.load(molde.dados);
 
     const d = new Date();
     const dd = String(d.getDate()).padStart(2,"0"), mm = String(d.getMonth()+1).padStart(2,"0"),
           aa = String(d.getFullYear()).slice(2);
-    const aba = livro.addWorksheet("Plano Tático-Acoi Time " + dd + " " + mm + " " + aa,
-      {views:[{state:"frozen", ySplit:1}]});
-
-    aba.columns = [{width:45.1},{width:12.63},{width:19.2},{width:18.4},{width:12.8},{width:16},{width:14}];
-
-    const fonte = {name:"Calibri", size:9};
-    const ALINHA = ["left","left","center","center","center","left","center"];
-    const pintar = (linha, cor, negrito) => {
-      for(let c = 1; c <= 7; c++){
-        const cel = linha.getCell(c);
-        cel.font = Object.assign({}, fonte, {bold:!!negrito, color:{argb: cor === NAVY ? "FFFFFFFF" : "FF000000"}});
-        if(cor) cel.fill = {type:"pattern", pattern:"solid", fgColor:{argb:cor}};
-        cel.alignment = {wrapText:true, vertical:"middle", horizontal:ALINHA[c-1]};
-      }
-    };
-
-    const cab = aba.addRow(["AÇÃO","RESULTADO ESPERADO","RESPONSÁVEL","PRAZO","STATUS","Observação","Novo Prazo"]);
-    pintar(cab, NAVY, true);
-    cab.eachCell(c => { c.alignment = {wrapText:true, vertical:"middle", horizontal:"center"}; });
-
-    const porFrente = {};
-    listaTarefas().forEach(t => { (porFrente[t.frente] = porFrente[t.frente] || []).push(t); });
-
-    let escritas = 0;
-    SECOES_PMO.forEach(([chave, titulo]) => {
-      const linhaSecao = aba.addRow([titulo, "", "", "", "", "", ""]);
-      pintar(linhaSecao, NAVY, true);
-      aba.mergeCells("A" + linhaSecao.number + ":G" + linhaSecao.number);
-
-      const itens = (porFrente[chave] || []).slice().sort((a,b) => {
-        const oa = Number(a.ordem) || 9999, ob = Number(b.ordem) || 9999;
-        return oa !== ob ? oa - ob : String(a.id).localeCompare(String(b.id), "pt-BR", {numeric:true});
-      });
-
-      itens.forEach(t => {
-        const objetivo = t.tipo_linha === "objetivo";
-        // Coluna D é o prazo ORIGINAL do PMO (ou o texto que eles escreveram
-        // no lugar da data); a data repactuada tem coluna própria, a G.
-        const prazoCel = t.prazo_texto ? t.prazo_texto
-          : (t.prazo_original ? new Date(String(t.prazo_original).slice(0,10) + "T00:00:00") : "");
-        const novoCel = t.novo_prazo_texto ? t.novo_prazo_texto
-          : (t.novo_prazo ? new Date(String(t.novo_prazo).slice(0,10) + "T00:00:00") : "");
-        // O STATUS devolvido é o que o PMO mantém à mão (inclusive o "Atrasado" deles,
-        // que sobrevive à repactuação do prazo). Só é recalculado quando alguém muda
-        // o status por aqui, e nesse caso status_pmo já foi atualizado junto.
-        const linha = aba.addRow([
-          t.tarefa || "",
-          t.resultado || "",
-          t.responsavel === "a-definir" ? "" : (t.responsavel || ""),
-          prazoCel,
-          objetivo ? "" : (t.status_pmo || STATUS_PMO[t.status] || ""),
-          t.observacao || "",
-          novoCel
-        ]);
-        pintar(linha, objetivo ? AZUL_CLARO : null, objetivo);
-        if(prazoCel instanceof Date) linha.getCell(4).numFmt = "dd/mm/yyyy";
-        if(novoCel instanceof Date) linha.getCell(7).numFmt = "dd/mm/yyyy";
-        escritas++;
-      });
-    });
-
+    const feito = montarAbaPmo(livro, listaTarefas(), "Plano Tático-Acoi Time " + dd + " " + mm + " " + aa);
+    if(!feito){
+      avisar("O arquivo de base, " + esc(molde.nome) + ", não tem nenhuma aba no formato do PMO (cabeçalho com Ação e Responsável). "
+        + "Use <em>Trocar o arquivo de base</em> e escolha a planilha do PMO.");
+      return;
+    }
     const buffer = await livro.xlsx.writeBuffer();
     entregarArquivo(new Blob([buffer], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),
       "Plano de Ação Consolidado - ACOI " + dd + "-" + mm + "-" + d.getFullYear() + ".xlsx");
-    avisar("<strong>Planilha gerada</strong> no formato do PMO, com " + escritas + " linhas nas 8 seções.", "ok");
+    avisar("<strong>Planilha gerada</strong> em cima de " + esc(molde.nome) + ". As abas do arquivo foram mantidas e entrou a aba <strong>"
+      + esc(feito.aba) + "</strong>, com " + feito.escritas + " linhas formatadas como na aba " + esc(feito.modelo)
+      + (feito.novas ? "; " + feito.novas + " linhas que não existiam lá copiaram a formatação da linha de cima" : "") + ".", "ok");
   } catch(e){
-    avisar("Não consegui montar a planilha. Recarregue a página e tente de novo.");
+    avisar("Não consegui montar a planilha. Recarregue a página e tente de novo. (" + esc(e && e.message) + ")");
   } finally {
     bt.disabled = false; bt.textContent = "Baixar planilha para o PMO (.xlsx)";
   }
