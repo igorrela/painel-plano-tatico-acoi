@@ -371,6 +371,7 @@ const COLUNAS = [
   {campo:"frente", titulo:"Frente", classe:"cel-frente", tipo:"opcao", opcoes:Object.keys(FRENTES)},
   {campo:"responsavel", titulo:"Responsável", classe:"cel-res", tipo:"texto"},
   {campo:"prazo", titulo:"Prazo", classe:"cel-prazo", tipo:"data"},
+  {campo:"novo_prazo", titulo:"Novo prazo", classe:"cel-prazo", tipo:"data"},
   {campo:"status", titulo:"Status", classe:"cel-status", tipo:"opcao", opcoes:Object.keys(STATUS)},
   {campo:"resultado", titulo:"Resultado esperado", classe:"cel-nota", tipo:"texto-longo"},
   {campo:"observacao", titulo:"Observação", classe:"cel-nota", tipo:"texto-longo"},
@@ -408,6 +409,10 @@ const est = {
 const HOJE = new Date().toISOString().slice(0,10);
 const $ = id => document.getElementById(id);
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+// Prazo inicial: o que o PMO combinou. Fica travado depois de preenchido; mudança
+// de data vai para o Novo prazo (pedido do Igor em 03/11/2026).
+function prazoInicial(t){ return t.prazo_original ? String(t.prazo_original).slice(0,10) : (!t.novo_prazo && t.prazo ? String(t.prazo).slice(0,10) : ""); }
+function prazoTravado(t){ return !!(prazoInicial(t) || String(t.prazo_texto || "").trim()); }
 function atrasada(t){ return !!t.prazo && t.prazo < HOJE && t.status!=="concluida" && t.status!=="cancelada"; }
 function diasDe(iso){ return Math.round((new Date(iso+"T00:00:00") - new Date(HOJE+"T00:00:00"))/86400000); }
 function dataBr(iso){ if(!iso) return "—"; const p=String(iso).slice(0,10).split("-"); return p.length===3 ? p[2]+"/"+p[1]+"/"+p[0] : iso; }
@@ -852,10 +857,16 @@ function renderPlanilha(){
             : '<span class="selo '+st.classe+'">'+esc(st.rotulo)+'</span>';
       } else if(c.campo === "frente"){ v = esc(FRENTES[t.frente]||t.frente||"—"); }
       else if(c.campo === "prazo"){
-        // O atraso aparece na data, em vermelho, sem mudar o que a coluna Status mostra.
-        v = t.prazo ? (atrasada(t) ? '<span style="color:var(--late);font-weight:600" title="Prazo vencido e tarefa não concluída">'+dataBr(t.prazo)+'</span>' : dataBr(t.prazo))
+        // O atraso aparece na data que vale (a nova, se houver), em vermelho.
+        const ini = prazoInicial(t);
+        v = ini ? (atrasada(t) && !t.novo_prazo ? '<span style="color:var(--late);font-weight:600" title="Prazo vencido e tarefa não concluída">'+dataBr(ini)+'</span>' : dataBr(ini))
           : t.prazo_texto ? '<span style="color:var(--ink-2)" title="Foi assim que o PMO escreveu, sem data de partida">'+esc(t.prazo_texto)+'</span>'
           : '<span style="color:var(--ink-3)">sem data</span>';
+      }
+      else if(c.campo === "novo_prazo"){
+        v = t.novo_prazo ? (atrasada(t) ? '<span style="color:var(--late);font-weight:600" title="Novo prazo vencido e tarefa não concluída">'+dataBr(t.novo_prazo)+'</span>' : dataBr(t.novo_prazo))
+          : t.novo_prazo_texto ? '<span style="color:var(--ink-2)">'+esc(t.novo_prazo_texto)+'</span>'
+          : '<span style="color:var(--ink-3)">—</span>';
       }
       else if(c.campo === "responsavel"){
         const x = (t.responsavel||"").trim();
@@ -868,7 +879,9 @@ function renderPlanilha(){
         const vazio = !(t.tarefa && String(t.tarefa).trim());
         v = vazio ? '<span style="color:var(--ink-3)">'+esc(textoDe(t))+'</span>' : esc(t.tarefa);
       } else { v = esc(t[c.campo]||"") || '<span style="color:var(--ink-3)">—</span>'; }
-      const ed = (c.tipo!=="fixo" && c.campo!=="status" && est.podeEditar) ? ' data-editar="'+esc(c.campo)+'"' : "";
+      const travado = c.campo === "prazo" && prazoTravado(t);
+      const ed = (c.tipo!=="fixo" && c.campo!=="status" && !travado && est.podeEditar) ? ' data-editar="'+esc(c.campo)+'"'
+        : (travado && est.podeEditar ? ' title="Prazo inicial travado. Para mudar a data, use a coluna Novo prazo."' : "");
       return '<td class="'+c.classe+'"'+ed+' data-id="'+esc(t.id)+'">'+v+'</td>';
     }).join("");
     const classes = [];
@@ -949,7 +962,7 @@ function abrirEdicao(td){
   const t = est.tarefas.get(id);
   if(!t) return;
   const col = COLUNAS.find(c => c.campo === campo);
-  const valor = campo==="prazo" ? (t.prazo ? String(t.prazo).slice(0,10) : "") : (t[campo] || "");
+  const valor = campo==="prazo" ? prazoInicial(t) : campo==="novo_prazo" ? (t.novo_prazo ? String(t.novo_prazo).slice(0,10) : "") : (t[campo] || "");
   let el;
   if(col.tipo === "opcao"){
     el = document.createElement("select");
@@ -982,10 +995,17 @@ function abrirEdicao(td){
         // Mudanças feitas aqui precisam chegar à planilha do PMO nas colunas certas.
         if(campo === "status") copia.status_pmo = STATUS_PMO[novo] || "";
         if(campo === "prazo"){
-          // Se a tarefa já tinha prazo repactuado, é ele que muda; senão, o original.
-          if(atual.novo_prazo) copia.novo_prazo = novo;
-          else copia.prazo_original = novo;
-          if(novo){ copia.prazo_texto = ""; copia.novo_prazo_texto = ""; }
+          // Só chega aqui tarefa ainda sem prazo inicial: é a primeira data dela.
+          if(prazoTravado(atual)){ renderPlanilha(); return; }
+          copia.prazo_original = novo;
+          copia.prazo = atual.novo_prazo || novo;
+          if(novo) copia.prazo_texto = "";
+        }
+        if(campo === "novo_prazo"){
+          // O prazo que vale passa a ser o novo; apagado, volta a valer o inicial.
+          copia.prazo = novo || prazoInicial(atual) || "";
+          if(!atual.prazo_original && !atual.novo_prazo && atual.prazo) copia.prazo_original = String(atual.prazo).slice(0,10);
+          if(novo) copia.novo_prazo_texto = "";
         }
         gravar(copia);
         return;
@@ -1185,6 +1205,9 @@ function compararComPlano(novas, carimbo){
         return;
       }
       const conserto = datasVelhas && (DATAS[d.campo] || TEXTO_DA_DATA[d.campo]);
+      // O prazo inicial também é travado na importação; só o conserto das datas antigas passa.
+      if(!conserto && d.de && (d.campo === "prazo_original" || d.campo === "prazo_texto")){ res.bloqueadas.push({atual:atual, d:d}); return; }
+      if(!conserto && d.de && d.campo === "prazo" && !n.novo_prazo && prazoTravado(atual)) return;
       const seguro = !d.de || conserto;
       if(carimbo ? !mudouNoPainel : seguro) entram.push(d); else esperam.push(d);
     });
@@ -1237,8 +1260,12 @@ function renderImportar(){
     const lBloq = imp.bloqueadas.map(b =>
       '<div class="mud-linha"><div class="cab"><span class="mono" style="color:var(--ink-3);font-size:11.5px">'+esc(b.atual.id)+'</span>'
       + '<strong style="font-size:12.5px">'+esc(String(textoDe(b.atual)).slice(0,110))+'</strong></div>'
-      + '<div class="campo-mud">Painel: <b>'+esc((STATUS[b.d.de]||{}).rotulo||b.d.de)+'</b> · planilha: '+esc((STATUS[b.d.para]||{}).rotulo||b.d.para)
-      + ' — status não volta atrás; se precisar, mude pela Planilha do painel.</div></div>').join("");
+      + (b.d.campo === "status"
+        ? '<div class="campo-mud">Painel: <b>'+esc((STATUS[b.d.de]||{}).rotulo||b.d.de)+'</b> · planilha: '+esc((STATUS[b.d.para]||{}).rotulo||b.d.para)
+          + ' — status não volta atrás; se precisar, mude pela Planilha do painel.</div>'
+        : '<div class="campo-mud">Prazo inicial no painel: <b>'+esc(DATAS_EXIBIR[b.d.campo] ? dataBr(b.d.de) : b.d.de)+'</b> · planilha: '
+          + esc(DATAS_EXIBIR[b.d.campo] ? dataBr(b.d.para) : (b.d.para || "vazio"))
+          + ' — o prazo inicial é travado; para mudar a data, use o Novo prazo.</div>') + '</div>').join("");
     const lNovas = imp.novas.slice(0,60).map(n =>
       '<div class="mud-linha"><div class="cab"><span class="selo neutro">nova</span>'
       + '<strong style="font-size:12.5px">'+esc(String(textoDe(n)).slice(0,110))+'</strong></div>'
@@ -1257,7 +1284,7 @@ function renderImportar(){
         + '<div class="dif nova"><div class="n mono">'+imp.novas.length+'</div><div class="r">ações novas</div></div>'
         + '<div class="dif mud"><div class="n mono">'+imp.mudadas.length+'</div><div class="r">com alteração</div></div>'
         + '<div class="dif"><div class="n mono">'+imp.pendentes.length+'</div><div class="r">ficam como no painel<br><small style="color:var(--ink-3)">você pode marcar</small></div></div>'
-        + '<div class="dif sumiu"><div class="n mono">'+imp.bloqueadas.length+'</div><div class="r">status que voltaria atrás<br><small style="color:var(--ink-3)">não muda</small></div></div>'
+        + '<div class="dif sumiu"><div class="n mono">'+imp.bloqueadas.length+'</div><div class="r">travadas<br><small style="color:var(--ink-3)">status para trás ou prazo inicial</small></div></div>'
         + '<div class="dif"><div class="n mono">'+imp.iguais+'</div><div class="r">sem mudança</div></div>'
         + '<div class="dif sumiu"><div class="n mono">'+imp.sumidas.length+'</div><div class="r">só no painel<br><small style="color:var(--ink-3)">não vieram no arquivo</small></div></div></div>'
       + (est.podeEditar
@@ -1269,7 +1296,7 @@ function renderImportar(){
       + ((imp.mudadas.length || imp.novas.length) ? '<div class="mudancas">'+lMud+lNovas+'</div>'
           : '<div class="vazio">Nada desta planilha entra sozinho no painel.</div>')
       + (lPend ? '<h3 style="margin-top:18px">Ficam como estão no painel</h3><div class="mudancas">'+lPend+'</div>' : '')
-      + (lBloq ? '<h3 style="margin-top:18px">Status que voltaria atrás</h3><div class="mudancas">'+lBloq+'</div>' : '')
+      + (lBloq ? '<h3 style="margin-top:18px">Travadas: status para trás ou prazo inicial</h3><div class="mudancas">'+lBloq+'</div>' : '')
       + (imp.sumidas.length ? '<p style="margin-top:14px;font-size:12.5px">As '+imp.sumidas.length+' tarefas que estão no painel e não vieram no arquivo <strong>não são apagadas</strong>. Se alguma deve sair, exclua pela planilha.</p>' : "")
       + '</div>';
   }
