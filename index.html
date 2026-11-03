@@ -787,7 +787,31 @@ function mostrandoEstrutura(){
     && !f.busca && !f.frente && !f.status && !f.responsavel && !f.soAtrasadas;
 }
 
+// Redesenhar a grade a cada gravação jogava a rolagem para a linha 1. Antes de
+// redesenhar, guarda onde está a linha em uso (ou a primeira visível) e, depois,
+// devolve a rolagem para ela ficar no mesmo lugar da tela. Filtro e ordenação
+// novos voltam ao topo de propósito.
+function lerPosicaoGrade(){
+  const caixa = document.querySelector("#vistaPlanilha .grade-caixa");
+  if(!caixa || est.irAoTopo){ est.irAoTopo = false; return null; }
+  const topo = caixa.getBoundingClientRect().top;
+  const linhas = Array.from(caixa.querySelectorAll("tr[data-linha]"));
+  const alvo = (est.linhaAtiva && linhas.find(tr => tr.dataset.linha === est.linhaAtiva))
+    || linhas.find(tr => tr.getBoundingClientRect().bottom > topo + 40);
+  return {top:caixa.scrollTop, left:caixa.scrollLeft, janela:window.scrollY,
+    id: alvo ? alvo.dataset.linha : "", desloc: alvo ? alvo.getBoundingClientRect().top - topo : 0};
+}
+function voltarPosicaoGrade(pos){
+  const caixa = document.querySelector("#vistaPlanilha .grade-caixa");
+  if(!pos || !caixa) return;
+  caixa.scrollLeft = pos.left;
+  caixa.scrollTop = pos.top;
+  const tr = pos.id && Array.from(caixa.querySelectorAll("tr[data-linha]")).find(x => x.dataset.linha === pos.id);
+  if(tr) caixa.scrollTop += (tr.getBoundingClientRect().top - caixa.getBoundingClientRect().top) - pos.desloc;
+  window.scrollTo(window.scrollX, pos.janela);
+}
 function renderPlanilha(){
+  const posicao = lerPosicaoGrade();
   const ts = filtrar();
   const donos = Array.from(new Set(listaTarefas().map(t=>t.responsavel).filter(Boolean))).sort((a,b)=>a.localeCompare(b,"pt-BR"));
   const opc = (lista, sel, rot) => lista.map(v => '<option value="'+esc(v)+'"'+(v===sel?" selected":"")+'>'+esc(rot?rot(v):v)+'</option>').join("");
@@ -874,31 +898,33 @@ function renderPlanilha(){
     + '</div>'
     + '<div class="grade-caixa"><table class="grade"><thead><tr>'+cab+'</tr></thead><tbody>'+corpo+'</tbody></table></div>';
 
+  voltarPosicaoGrade(posicao);
   const raiz = $("vistaPlanilha");
   let tmr;
   raiz.querySelector("#fBusca").addEventListener("input", e => {
     clearTimeout(tmr); const v = e.target.value;
     tmr = setTimeout(() => {
-      est.filtros.busca = v; renderPlanilha();
+      est.filtros.busca = v; est.irAoTopo = true; renderPlanilha();
       const b = $("fBusca"); if(b){ b.focus(); b.setSelectionRange(b.value.length, b.value.length); }
     }, 220);
   });
-  raiz.querySelector("#fFrente").addEventListener("change", e => { est.filtros.frente = e.target.value; renderPlanilha(); });
-  raiz.querySelector("#fStatus").addEventListener("change", e => { est.filtros.status = e.target.value; renderPlanilha(); });
-  raiz.querySelector("#fDono").addEventListener("change", e => { est.filtros.responsavel = e.target.value; renderPlanilha(); });
-  raiz.querySelector("#fAtraso").addEventListener("click", () => { est.filtros.soAtrasadas = !est.filtros.soAtrasadas; renderPlanilha(); });
+  raiz.querySelector("#fFrente").addEventListener("change", e => { est.filtros.frente = e.target.value; est.irAoTopo = true; renderPlanilha(); });
+  raiz.querySelector("#fStatus").addEventListener("change", e => { est.filtros.status = e.target.value; est.irAoTopo = true; renderPlanilha(); });
+  raiz.querySelector("#fDono").addEventListener("change", e => { est.filtros.responsavel = e.target.value; est.irAoTopo = true; renderPlanilha(); });
+  raiz.querySelector("#fAtraso").addEventListener("click", () => { est.filtros.soAtrasadas = !est.filtros.soAtrasadas; est.irAoTopo = true; renderPlanilha(); });
   const bn = raiz.querySelector("#btNova"); if(bn) bn.addEventListener("click", novaTarefa);
   raiz.querySelectorAll("th[data-ordenar]").forEach(th => th.addEventListener("click", () => {
     const c = th.dataset.ordenar;
     if(est.ordem.campo === c) est.ordem.dir = est.ordem.dir==="asc" ? "desc" : "asc";
     else est.ordem = {campo:c, dir:"asc"};
+    est.irAoTopo = true;
     renderPlanilha();
   }));
   raiz.querySelectorAll("td[data-editar]").forEach(td => td.addEventListener("click", () => abrirEdicao(td)));
   raiz.querySelectorAll("select[data-status]").forEach(s => {
     const id = s.dataset.status;
     // Enquanto a lista está em uso, a grade não é redesenhada por baixo dela.
-    s.addEventListener("focus", () => { est.editando = {id, campo:"status"}; });
+    s.addEventListener("focus", () => { est.editando = {id, campo:"status"}; est.linhaAtiva = id; });
     s.addEventListener("blur", () => {
       if(est.editando && est.editando.id === id) est.editando = null;
       if(!est.editando && est.redesenhar){ est.redesenhar = false; renderizar(); }
@@ -939,6 +965,7 @@ function abrirEdicao(td){
   else { el = document.createElement("input"); el.type = "text"; el.value = valor; }
   el.className = "editando";
   est.editando = {id, campo};
+  est.linhaAtiva = id;
   td.innerHTML = ""; td.appendChild(el); el.focus();
   if(el.select && col.tipo !== "data") el.select();
 
