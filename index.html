@@ -586,8 +586,11 @@ async function carregarTarefas(){
   marcarSinc("vivo", est.podeEditar ? "sincronizado" : "leitura");
 }
 
+let canalAoVivo = null;
 function ligarTempoReal(){
-  sb.channel("tarefas-ao-vivo")
+  // Um canal só por página; ligar duas vezes duplicava os avisos ao vivo.
+  if(canalAoVivo) return;
+  canalAoVivo = sb.channel("tarefas-ao-vivo")
     .on("postgres_changes", {event:"*", schema:"public", table:"tarefas"}, carga => {
       if(carga.eventType === "DELETE"){ est.tarefas.delete(carga.old.id); }
       else { est.tarefas.set(carga.new.id, carga.new); }
@@ -629,7 +632,9 @@ async function gravar(t){
   const corpo = paraBanco(t);
   est.tarefas.set(corpo.id, Object.assign({}, est.tarefas.get(corpo.id) || {}, corpo));
   renderizar();
-  const {error} = await sb.from("tarefas").upsert(corpo);
+  // Se o banco não responder, avisa em vez de deixar a mudança só na tela.
+  const limite = new Promise(ok => setTimeout(() => ok({error:{message:"sem resposta do banco"}}), 15000));
+  const {error} = await Promise.race([sb.from("tarefas").upsert(corpo), limite]);
   if(error){ avisar("Não salvei a tarefa " + esc(corpo.id) + ". " + esc(mensagemErro(error))); await carregarTarefas(); renderizar(); }
 }
 async function apagar(id){
@@ -1524,11 +1529,21 @@ function aplicarTema(valor){
 aplicarTema(lerTema());
 SELETORES_TEMA.forEach(s => { if(s) s.addEventListener("change", e => aplicarTema(e.target.value)); });
 
+// Chamar o banco de dentro do aviso de login trava a sessão do Supabase:
+// a primeira gravação passa e as seguintes ficam esperando para sempre.
+// Por isso a entrada roda fora do aviso (setTimeout) e uma vez só.
+let entrou = false;
+function entrarUmaVez(sessao){
+  if(entrou || !sessao) return;
+  entrou = true;
+  setTimeout(() => aoEntrar(sessao), 0);
+}
 sb.auth.onAuthStateChange((evento, sessao) => {
-  if(sessao && $("telaApp").hidden) aoEntrar(sessao);
+  if(evento === "SIGNED_OUT") entrou = false;
+  else if($("telaApp").hidden) entrarUmaVez(sessao);
 });
 sb.auth.getSession().then(({data}) => {
-  if(data.session) aoEntrar(data.session);
+  if(data.session) entrarUmaVez(data.session);
   else if(window.location.hash.includes("error")){
     recado("Não consegui concluir a entrada por esse link. Use e-mail e senha abaixo.", "ruim");
   }
