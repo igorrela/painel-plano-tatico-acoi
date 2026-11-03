@@ -183,6 +183,8 @@ td.cel-res{min-width:120px; max-width:170px}
 td.cel-prazo{white-space:nowrap; font-family:"IBM Plex Mono", monospace; font-size:12.5px}
 td.cel-frente, td.cel-prio{white-space:nowrap}
 td.cel-status .selo{white-space:nowrap; display:inline-block; margin:1px 0}
+select.selo{font:inherit; font-size:11px; font-weight:500; padding:2px 6px; cursor:pointer}
+@media print{ select.selo{appearance:none; -webkit-appearance:none} }
 td.cel-nota{min-width:180px; max-width:300px; color:var(--ink-2); font-size:12.5px}
 td[data-editar]{cursor:text}
 td .editando{width:100%; border:1.5px solid var(--accent); border-radius:4px; padding:5px 7px; font:inherit; font-size:13px; background:var(--surface); color:var(--ink); min-height:30px}
@@ -595,7 +597,7 @@ function ligarTempoReal(){
     .on("postgres_changes", {event:"*", schema:"public", table:"tarefas"}, carga => {
       if(carga.eventType === "DELETE"){ est.tarefas.delete(carga.old.id); }
       else { est.tarefas.set(carga.new.id, carga.new); }
-      if(!est.editando) renderizar();
+      if(!est.editando) renderizar(); else est.redesenhar = true;
     })
     .subscribe();
 }
@@ -814,12 +816,20 @@ function renderPlanilha(){
         // Mostra sempre o status gravado; o atraso vem como aviso ao lado. Antes, a tarefa
         // vencida aparecia só como "Atrasada" e quem escolhia o status que ela já tinha
         // achava que a mudança não tinha sido salva.
+        // Quem edita escolhe o status direto numa lista fixa, que grava ao escolher.
+        // A lista que abria ao clicar na célula se fechava sozinha no Mac quando o
+        // Chrome abria as opções, e a escolha caía numa lista que já não existia.
+        const st = STATUS[t.status] || STATUS["a-fazer"];
         v = objetivo ? '<span style="opacity:.55">título de grupo</span>'
-          : '<span class="selo '+(STATUS[t.status]||STATUS["a-fazer"]).classe+'">'+esc((STATUS[t.status]||STATUS["a-fazer"]).rotulo)+'</span>'
-            + (atrasada(t) ? ' <span class="selo late" title="O prazo já passou e a tarefa não foi concluída">prazo vencido</span>' : '');
+          : est.podeEditar
+            ? '<select class="selo '+st.classe+'" data-status="'+esc(t.id)+'" aria-label="Status da tarefa '+esc(t.id)+'">'
+              + Object.keys(STATUS).map(k => '<option value="'+k+'"'+(k===t.status?' selected':'')+'>'+esc(STATUS[k].rotulo)+'</option>').join("")
+              + '</select>'
+            : '<span class="selo '+st.classe+'">'+esc(st.rotulo)+'</span>';
       } else if(c.campo === "frente"){ v = esc(FRENTES[t.frente]||t.frente||"—"); }
       else if(c.campo === "prazo"){
-        v = t.prazo ? dataBr(t.prazo)
+        // O atraso aparece na data, em vermelho, sem mudar o que a coluna Status mostra.
+        v = t.prazo ? (atrasada(t) ? '<span style="color:var(--late);font-weight:600" title="Prazo vencido e tarefa não concluída">'+dataBr(t.prazo)+'</span>' : dataBr(t.prazo))
           : t.prazo_texto ? '<span style="color:var(--ink-2)" title="Foi assim que o PMO escreveu, sem data de partida">'+esc(t.prazo_texto)+'</span>'
           : '<span style="color:var(--ink-3)">sem data</span>';
       }
@@ -834,7 +844,7 @@ function renderPlanilha(){
         const vazio = !(t.tarefa && String(t.tarefa).trim());
         v = vazio ? '<span style="color:var(--ink-3)">'+esc(textoDe(t))+'</span>' : esc(t.tarefa);
       } else { v = esc(t[c.campo]||"") || '<span style="color:var(--ink-3)">—</span>'; }
-      const ed = (c.tipo!=="fixo" && est.podeEditar) ? ' data-editar="'+esc(c.campo)+'"' : "";
+      const ed = (c.tipo!=="fixo" && c.campo!=="status" && est.podeEditar) ? ' data-editar="'+esc(c.campo)+'"' : "";
       return '<td class="'+c.classe+'"'+ed+' data-id="'+esc(t.id)+'">'+v+'</td>';
     }).join("");
     const classes = [];
@@ -885,6 +895,21 @@ function renderPlanilha(){
     renderPlanilha();
   }));
   raiz.querySelectorAll("td[data-editar]").forEach(td => td.addEventListener("click", () => abrirEdicao(td)));
+  raiz.querySelectorAll("select[data-status]").forEach(s => {
+    const id = s.dataset.status;
+    // Enquanto a lista está em uso, a grade não é redesenhada por baixo dela.
+    s.addEventListener("focus", () => { est.editando = {id, campo:"status"}; });
+    s.addEventListener("blur", () => {
+      if(est.editando && est.editando.id === id) est.editando = null;
+      if(!est.editando && est.redesenhar){ est.redesenhar = false; renderizar(); }
+    });
+    s.addEventListener("change", () => {
+      est.editando = null; est.redesenhar = false;
+      const atual = est.tarefas.get(id);
+      if(!atual || s.value === atual.status) return;
+      gravar(Object.assign({}, atual, {status:s.value, status_pmo:STATUS_PMO[s.value] || ""}));
+    });
+  });
   raiz.querySelectorAll("[data-apagar]").forEach(b => b.addEventListener("click", ev => {
     ev.stopPropagation();
     const t = est.tarefas.get(b.dataset.apagar);
