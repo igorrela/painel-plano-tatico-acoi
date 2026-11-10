@@ -1837,7 +1837,7 @@ function renderPessoas(){
     + '</tbody></table></div></div>'
 
     + '<div class="painel"><h3>Liberar acesso para alguém</h3>'
-    + '<p>O e-mail precisa ser o mesmo que a pessoa vai digitar na tela de entrada. Depois de salvar, avise ela para abrir o painel e pedir o link.</p>'
+    + '<p>O e-mail precisa ser o mesmo que a pessoa vai digitar na tela de entrada. Depois de salvar, mande para ela o endereço do painel e o código de convite, e peça para ela usar a aba Primeiro acesso.</p>'
     + '<form id="formPessoa" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'
       + '<label class="campo" style="margin:0;flex:1;min-width:180px"><span>Nome</span><input id="pNome" placeholder="Francislene" required></label>'
       + '<label class="campo" style="margin:0;flex:1.4;min-width:230px"><span>E-mail</span><input id="pEmail" type="email" placeholder="nome@acoi.com.br" required spellcheck="false"></label>'
@@ -1880,7 +1880,7 @@ function renderPessoas(){
           : "Não consegui liberar o acesso. " + esc(mensagemErro(error));
       } else {
         rec.className = "recado bom";
-        rec.innerHTML = "<strong>Acesso liberado para " + esc(email) + ".</strong> Avise a pessoa para abrir o painel e pedir o link de entrada.";
+        rec.innerHTML = "<strong>Acesso liberado para " + esc(email) + ".</strong> Mande para ela o endereço do painel e o código de convite, e peça para ela usar a aba Primeiro acesso.";
         $("pNome").value = ""; $("pEmail").value = "";
         await carregarPessoas(); renderPessoas();
       }
